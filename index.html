@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Space Weather Ethereal</title>
+<meta name="description" content="An ambient, data-driven Three.js journey from the Sun to the aurora, driven by live NOAA SWPC and GFZ Potsdam space weather data.">
+<link rel="stylesheet" href="css/style.css">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Ccircle cx='32' cy='32' r='18' fill='%23ffb347'/%3E%3Ccircle cx='32' cy='32' r='28' fill='none' stroke='%2366ffcc' stroke-width='3' opacity='.6'/%3E%3C/svg%3E">
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"
+  }
+}
+</script>
+</head>
+<body>
+<canvas id="c" aria-label="Space weather visualization"></canvas>
+
+<div id="ui">
+  <header id="top">
+    <div class="title">
+      <h1>Space Weather Ethereal</h1>
+      <div id="badge" class="badge snapshot" title="Where the data came from">
+        <span class="dot"></span><span id="badge-mode">loading</span>
+        <span id="badge-asof"></span>
+      </div>
+    </div>
+    <nav id="picker" aria-label="Scenes"></nav>
+  </header>
+
+  <section id="caption" aria-live="polite">
+    <div id="cap-kicker"></div>
+    <h2 id="cap-title"></h2>
+    <p id="cap-text"></p>
+    <p id="cap-inst"></p>
+    <p id="cap-note"></p>
+  </section>
+
+  <section id="readout" aria-label="Current values"></section>
+
+  <div id="strip-wrap" hidden title="Bartels light-up strip: each row is one 27-day solar rotation; the glowing stem is the reading being played, in its note color">
+    <canvas id="strip" aria-label="Bartels light-up strip"></canvas>
+  </div>
+
+  <aside id="orch" hidden aria-label="Orchestra"></aside>
+
+  <footer id="controls">
+    <button id="btn-tour" class="on" title="Auto tour (T)">Tour: on</button>
+    <button id="btn-replay" title="Replay the last ~135 days silently (R)">Replay: off</button>
+    <button id="btn-sound" title="Play the data as music (S)">Sound: off</button>
+    <button id="btn-orch" title="Orchestra mixer (O)">Orchestra</button>
+    <button id="btn-hide" title="Hide the text (H)">Hide text</button>
+    <button id="btn-info" title="About and sources (I)">About</button>
+    <div id="replay-bar" hidden><div id="replay-fill"></div><span id="replay-date"></span></div>
+  </footer>
+</div>
+
+<div id="about" hidden>
+  <div class="about-inner">
+    <button id="about-close" aria-label="Close">×</button>
+    <h2>About this piece</h2>
+    <p>A slow, ambient tour of the chain of physics behind space weather: the Sun's activity, the solar wind it blows across the solar system, Earth's magnetic shield, and the aurora where that energy lands in our upper atmosphere.</p>
+    <p><b>Measured data</b> drives every scene: the Kp and Ap geomagnetic indices, F10.7 solar radio flux, sunspot number, and the solar wind speed, density, and magnetic field direction (Bz) measured upstream of Earth at the L1 point.</p>
+    <p><b>Everything you see is a visualization, not an image.</b> Shapes and colors are procedural and stylized after how scientists display these phenomena (for example SDO/AIA 304 Å false color, IMAGE and Polar ultraviolet auroral images). Sizes and distances are not to scale. Where a number comes from a physics model rather than a measurement, it is labeled "model".</p>
+    <h3>Sound</h3>
+    <p>The <b>Orchestra</b> is the Space Weather Sonifier built in: each data set is a player with its own voice (airport piano, slow pad, shimmer glass, soft choir, bell, glass, pluck), on a long reverb and a tempo-synced delay. One step is one 3-hour Kp reading. Every note's pitch becomes a color (hue = pitch class × 30°, C = red), and that color flashes in the scene where the data lives: F10.7 and sunspots on the Sun, wind speed and density along the Parker spiral, Bz on the magnetopause, Kp and Ap in the aurora. Sound starts only when you press Sound or Play.</p>
+    <h3>Data sources</h3>
+    <ul>
+      <li>NOAA Space Weather Prediction Center (SWPC): planetary K-index, real-time solar wind and IMF, 10.7 cm flux, SWPC sunspot number. Fetched live when your browser can reach it.</li>
+      <li>GFZ Helmholtz Centre for Geosciences, Potsdam: Kp history, Ap, F10.7 observed, international sunspot number (SILSO). Included as a bundled snapshot.</li>
+    </ul>
+    <div id="about-status"></div>
+    <h3>Controls</h3>
+    <p>Drag to orbit, scroll or pinch to zoom. Keys: ← → change scene, T tour, R replay, S sound (play/pause the orchestra), O orchestra panel, B Bartels strip, H hide text, I about.</p>
+    <p class="small">Made with Three.js. Code under the MIT License.</p>
+  </div>
+</div>
+
+<div id="fallback" hidden>
+  <p>This piece needs WebGL. Try a recent version of Chrome, Edge, Firefox, or Safari.</p>
+</div>
+
+<script type="module" src="js/main.js"></script>
+</body>
+</html>
