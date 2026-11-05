@@ -7,6 +7,7 @@ const HOUR_MS = 3600e3;
 export const ROT = 216; // steps in a 27-day Bartels rotation (27 days x 8 three-hour readings)
 export const BARTELS_EPOCH = Date.UTC(1832, 1, 8);
 
+import { Spatial, availableModes } from './spatial.js';
 import { findEvents, chainFor, buildSlots, resample } from './timeline.js';
 export const ORDER = ['kp', 'ap', 'f107', 'sn', 'speed', 'dens', 'bz', 'xr', 'sr'];
 export const SET_INFO = {
@@ -143,20 +144,25 @@ function makeIR(ctx, sec) {
   }
   return buf;
 }
-function buildRig() {
+function buildRig(outWant = 'auto') {
   const Ctor = window.AudioContext || window.webkitAudioContext;
   if (!Ctor) return null;
   const ctx = new Ctor();
   const comp = ctx.createDynamicsCompressor(); comp.threshold.value = -16; comp.ratio.value = 4; comp.connect(ctx.destination);
   const master = ctx.createGain(); master.gain.value = 0.75; master.connect(comp);
-  const bus = ctx.createGain(); const dry = ctx.createGain(); bus.connect(dry); dry.connect(master);
+  // dry path: channel -> spatial stage (stereo pan / HRTF panner / VBAP) -> dryOut -> dry -> master
+  const dryOut = ctx.createGain(); const dry = ctx.createGain(); dryOut.connect(dry); dry.connect(master);
+  // shared sends: channel -> bus -> delay + reverb -> wetIn (routed to the speakers by the spatial stage)
+  const bus = ctx.createGain(), wetIn = ctx.createGain();
   const delay = ctx.createDelay(4); const dlp = ctx.createBiquadFilter(); dlp.type = 'lowpass'; dlp.frequency.value = 3200;
   const fb = ctx.createGain(); const dWet = ctx.createGain();
-  bus.connect(delay); delay.connect(dlp); dlp.connect(fb); fb.connect(delay); dlp.connect(dWet); dWet.connect(master);
+  bus.connect(delay); delay.connect(dlp); dlp.connect(fb); fb.connect(delay); dlp.connect(dWet); dWet.connect(wetIn);
   const conv = ctx.createConvolver(); const rIn = ctx.createGain(); const rWet = ctx.createGain();
-  bus.connect(rIn); dWet.connect(rIn); rIn.connect(conv); conv.connect(rWet); rWet.connect(master);
+  bus.connect(rIn); dWet.connect(rIn); rIn.connect(conv); conv.connect(rWet); rWet.connect(wetIn);
   const lfo = ctx.createOscillator(); lfo.frequency.value = 0.31; const wob = ctx.createGain(); wob.gain.value = 7; lfo.connect(wob); lfo.start();
-  return { ctx, master, bus, dry, delay, fb, dWet, conv, rWet, wob, chans: {}, active: 0, revLen: 0 };
+  const sp = new Spatial(ctx, { dryOut, wetIn, master, comp }); sp.setMode(outWant);
+  const marker = ctx.createGain(); marker.connect(sp.input('marker')); marker.connect(bus);
+  return { ctx, master, bus, dry, delay, fb, dWet, conv, rWet, wob, sp, marker, chans: {}, active: 0, revLen: 0 };
 }
 function applyFx(rig, fx, bpm) {
   const t = rig.ctx.currentTime;
@@ -171,13 +177,13 @@ function chanNode(rig, id, ch) {
   let c = rig.chans[id];
   if (!c) {
     const g = rig.ctx.createGain();
-    const p = typeof rig.ctx.createStereoPanner === 'function' ? rig.ctx.createStereoPanner() : null;
-    if (p) { g.connect(p); p.connect(rig.bus); } else g.connect(rig.bus);
-    c = { g, p }; rig.chans[id] = c;
+    g.connect(rig.sp.input(id)); // positioned dry signal
+    g.connect(rig.bus);          // shared reverb/delay send
+    c = { g }; rig.chans[id] = c;
   }
   const t = rig.ctx.currentTime;
   c.g.gain.setTargetAtTime(ch.vol, t, 0.05);
-  if (c.p) c.p.pan.setTargetAtTime(ch.pan, t, 0.05);
+  rig.sp.setPan(id, ch.pan);
   return c.g;
 }
 function playNote(rig, inst, f, t0, hold, vel, out) {
@@ -354,8 +360,31 @@ export class Orchestra {
   }
   kFor(id, j) { return this.kAtTime(timeAt(this.S[id], j)); }
   timeOf(k) { return this.T ? this.T[Math.max(0, Math.min(this.N - 1, k))] : 0; }
+  // ---- output: Auto / Stereo / Headphones 3D / 5.1 / 7.1
+  get outWant() { try { return localStorage.getItem('swe.out') || 'auto'; } catch (_e) { return 'auto'; } }
+  setOutput(want) {
+    try { localStorage.setItem('swe.out', want); } catch (_e) { /* private mode */ }
+    if (this.rig) this.rig.sp.setMode(want);
+    this.emit('state', this);
+  }
+  outputInfo() {
+    if (this.rig) return this.rig.sp.describe();
+    const want = this.outWant; return { want, mode: null, maxCh: null, available: availableModes(2), detected: false };
+  }
+  probeOutput() { if (!this.rig) { this.rig = buildRig(this.outWant); if (this.rig) this.refresh(); } return this.outputInfo(); }
+  spatialUpdate(camera, anchorOf) { if (this.rig) this.rig.sp.update(camera, anchorOf); }
+  // speaker test: ping each channel in turn; cb(name, i, n) for the label
+  async speakerTest(cb) {
+    const rig = this.ensureRig(); if (!rig) return;
+    try { await rig.ctx.resume(); } catch (_e) { /* ignore */ }
+    rig.master.gain.setTargetAtTime(0.75, rig.ctx.currentTime, 0.02);
+    const names = rig.sp.testNames(); this.testing = true;
+    for (let i = 0; i < names.length; i++) { if (!this.testing) break; rig.sp.ping(i); cb && cb(names[i], i, names.length); await new Promise((r) => setTimeout(r, 1100)); }
+    this.testing = false; cb && cb(null, names.length, names.length);
+    if (!this.playing) rig.master.gain.setTargetAtTime(0, rig.ctx.currentTime, 0.3);
+  }
   ensureRig() {
-    if (!this.rig) this.rig = buildRig();
+    if (!this.rig) this.rig = buildRig(this.outWant);
     if (!this.rig) return null;
     if (this.rig.ctx.state === 'suspended') this.rig.ctx.resume();
     this.refresh();
@@ -400,7 +429,7 @@ export class Orchestra {
     const anySolo = this.anySolo(), sc = this.steps, fired = [];
     this.updateDrone(k, t, stepS);
     const rot = (x) => Math.floor((x - BARTELS_EPOCH) / (27 * 24 * HOUR_MS));
-    if (rig && this.marker && (k === 0 || rot(this.T[k]) !== rot(this.T[k - 1]))) playNote(rig, 'pad', hz(BASE_MIDI - 12), t, Math.min(4, stepS * 8), 0.6, rig.bus);
+    if (rig && this.marker && (k === 0 || rot(this.T[k]) !== rot(this.T[k - 1]))) playNote(rig, 'pad', hz(BASE_MIDI - 12), t, Math.min(4, stepS * 8), 0.6, rig.marker);
     for (const id of ORDER) {
       const ch = this.ch[id]; if (!ch.on) continue;
       const ds = this.S[id], v = this.R[id][k]; if (!(v > MISSING)) continue; // time-aligned value at this slot

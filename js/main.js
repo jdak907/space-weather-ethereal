@@ -18,6 +18,7 @@ import { Orchestra, noteColor, noteName, SET_INFO } from './orchestra.js';
 import { createReactions } from './reactions.js';
 import { BartelsStrip } from './strip.js';
 import { buildPanel } from './panel.js';
+import * as spatial from './spatial.js';
 
 // Colors are authored directly in display space; no color-space conversion anywhere.
 THREE.ColorManagement.enabled = false;
@@ -188,7 +189,7 @@ function setBadge() {
 
 function readout() {
   if (!D) return;
-  const s = scenes[cur];
+  const s = scenes[shown >= 0 ? shown : cur];
   const f = (v, d = 0) => (v === null || v === undefined || !isFinite(v) ? '—' : Number(v).toFixed(d));
   const Dp = Math.max(0.1, 1.6726e-6 * P.swDens * P.swSpeed * P.swSpeed);
   const { r0 } = shue(Dp, P.bz);
@@ -226,21 +227,29 @@ function readoutSR(f, rows, add) {
 }
 
 // ---------- scene switching, tour, captions
-let cur = 0, next = -1, fadeT = 0;
+let cur = 0, next = -1, fadeT = 0, shown = -1;
 const FADE = 4.0, DWELL = Math.max(5, +params.get('dwell') || (low ? 34 : 42));
 let tourOn = params.get('tour') !== '0', dwellT = 0;
 function caption(s) {
   const c = $('caption'); c.classList.add('fade');
-  setTimeout(() => {
+  clearTimeout(caption.tm);
+  caption.tm = setTimeout(() => {
     $('cap-kicker').textContent = s.kicker; $('cap-title').textContent = s.title; $('cap-text').textContent = s.text;
     $('cap-inst').textContent = s.instrument; $('cap-note').textContent = s.note; c.classList.remove('fade'); readout();
-  }, 600);
+  }, 300);
 }
-function setActive(i) {
-  scenes.forEach((s, k) => (s.controls.enabled = k === i));
+function setActive(i) { scenes.forEach((s, k) => (s.controls.enabled = k === i)); }
+// caption, picker highlight and scene-specific panels switch when the picture does (crossfade midpoint),
+// not when the fade starts, so the text never describes the scene that is still on screen
+function showScene(i) {
+  shown = i;
   document.body.classList.toggle('sr-on', scenes[i].id === 'schumann');
   document.querySelectorAll('#picker button').forEach((b, k) => b.classList.toggle('active', k === i));
+  caption(scenes[i]);
+  if (orch.rig) orch.rig.sp.setRefDistance(audioRef(scenes[i]));
 }
+const audioRef = (s) => (s.orbit && s.orbit.home ? s.orbit.home * 0.5 : 40);
+function visibleScene() { return next >= 0 && xfade.mix >= 0.45 ? next : cur; }
 function go(i, instant = false) {
   i = (i + scenes.length) % scenes.length;
   if (instant) { cur = i; next = -1; fadeT = 0; xfade.b = null; xfade.mix = 0; }
@@ -248,7 +257,8 @@ function go(i, instant = false) {
     if (next >= 0) { cur = next; next = -1; xfade.b = null; xfade.mix = 0; } // finish a pending fade
     if (i !== cur) { next = i; fadeT = 0; }
   }
-  dwellT = 0; setActive(i); caption(scenes[i]);
+  dwellT = 0; setActive(i);
+  if (instant || next < 0) showScene(i);
 }
 scenes.forEach((s, i) => {
   const b = document.createElement('button'); b.textContent = s.label; b.title = s.title;
@@ -319,8 +329,19 @@ function syncSound() {
 function toggleOrch(force) {
   const a = $('orch'); a.hidden = force !== undefined ? !force : !a.hidden;
   $('btn-orch').classList.toggle('on', !a.hidden); document.body.classList.toggle('orch-open', !a.hidden);
+  if (!a.hidden && !orch.rig && navigator.userActivation && navigator.userActivation.isActive) { orch.probeOutput(); panel.render(); } // detect output channels on a real click
 }
 function setStrip(on) { opt.strip = on; $('strip-wrap').hidden = !on; strip.dirty = true; }
+// Bartels strip: one click / E / double-click on its header enlarges or minimizes it (remembered)
+function setStripBig(on, save = true) {
+  strip.setBig(on); $('strip-wrap').classList.toggle('big', !!on);
+  const b = $('strip-size'); b.textContent = on ? '⤡' : '⤢'; b.setAttribute('aria-pressed', on ? 'true' : 'false');
+  b.setAttribute('aria-label', on ? 'Minimize Bartels strip' : 'Enlarge Bartels strip'); b.title = (on ? 'Minimize' : 'Enlarge') + ' (E, or double-click the header)';
+  if (save) try { localStorage.setItem('swe.stripBig', on ? '1' : '0'); } catch (_e) { /* private mode */ }
+}
+$('strip-size').onclick = (e) => { e.stopPropagation(); setStripBig(!strip.big); };
+$('strip-head').ondblclick = (e) => { if (e.target.id !== 'strip-size') setStripBig(!strip.big); };
+try { if (localStorage.getItem('swe.stripBig') === '1') setStripBig(true, false); } catch (_e) { /* private mode */ }
 const panel = buildPanel($('orch'), orch, {
   play: startOrchestra, close: () => toggleOrch(false), stripSet: () => strip.id,
   setStrip: (id) => strip.setSet(id), get: (k) => opt[k],
@@ -362,6 +383,7 @@ addEventListener('keydown', (e) => {
   if (k === 'arrowright') go((next >= 0 ? next : cur) + 1); else if (k === 'arrowleft') go((next >= 0 ? next : cur) - 1);
   else if (k === 't') toggleTour(); else if (k === 'r') toggleReplay(); else if (k === 's') toggleSound();
   else if (k === 'o') toggleOrch(); else if (k === 'b') { setStrip(!opt.strip); panel.render(); }
+  else if (k === 'e') { if (!opt.strip) setStrip(true); setStripBig(!strip.big); }
   else if (k === 'h') toggleText(); else if (k === 'i') toggleAbout(); else if (k === 'escape') toggleAbout(false);
   else if (/^[1-6]$/.test(k)) go(+k - 1);
 });
@@ -419,6 +441,7 @@ function frame() {
       if (fadeT >= FADE) { cur = next; next = -1; xfade.b = null; xfade.mix = 0; }
     }
     xfade.a = scenes[cur];
+    const vis = visibleScene(); if (vis !== shown) showScene(vis);
     const bTarget = next >= 0 ? THREE.MathUtils.lerp(scenes[cur].bloom ?? 0.8, scenes[next].bloom ?? 0.8, xfade.mix) : (scenes[cur].bloom ?? 0.8);
     bloom.strength = bTarget * (low ? 0.85 : 1);
     const active = [scenes[cur]]; if (next >= 0) active.push(scenes[next]);
@@ -429,6 +452,8 @@ function frame() {
 
     // orchestra: hand over notes whose audio time has come, then animate their reactions
     orch.drain();
+    // spatial audio: the listener rides the visible scene's camera; each voice sits at its anchor there
+    if (orch.rig) { const vs = scenes[vis], rd = audioRef(vs); if (orch.rig.sp.refDist !== rd) orch.rig.sp.setRefDistance(rd); orch.spatialUpdate(vs.camera, (id) => spatial.anchorFor(vs, id, t)); }
     reactions.update(dt);
     if (opt.strip) strip.draw(dt);
     readoutAcc += dt; if (readoutAcc > 1) { readoutAcc = 0; readout(); }
@@ -537,5 +562,5 @@ function setDemo(on) {
     lonIn.addEventListener('change', () => { const x = lonIn.value.trim(); setLon(x === '' ? null : x); setBadge(); readout(); drawMarkers(); drawHUD(); $('lon-note').textContent = getLon() === null ? 'Showing GMST only.' : `Showing LST for ${getLon()}°.`; });
   }
   if (params.get('orch') === '1') toggleOrch(true);
-  window.__spacewx = { get D() { return D; }, P, scenes, go, orch, reactions, strip, opt, chainLog, setDemo, clockT, get cur() { return cur; }, get playK() { return playK; } };
+  window.__spacewx = { spatial, THREE, setStripBig, goQueue, get shown() { return shown; }, get D() { return D; }, P, scenes, go, orch, reactions, strip, opt, chainLog, setDemo, clockT, get cur() { return cur; }, get playK() { return playK; } };
 })();

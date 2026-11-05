@@ -221,14 +221,17 @@ export function createCurtain(ctx) {
     update(t, dt, P) {
       U.uTime.value = t; U.uKp.value = P.kp;
       const kp = P.kp;
-      const bright = 0.6 + 0.2 * kp;
+      // brightness rises with Kp but saturates above Kp 5, so a big storm reads as taller, redder and
+      // wider rather than as a white-out (bloom also backs off a little at high Kp)
+      const bright = 0.6 + 0.2 * Math.min(kp, 3) + 0.04 * Math.max(0, kp - 3);
+      this.bloom = 1.0 - 0.09 * THREE.MathUtils.clamp(kp - 3, 0, 4);
       const nOn = THREE.MathUtils.clamp(2 + Math.round(kp * 0.5), 2, NC);
       const red = THREE.MathUtils.smoothstep(kp, 2.5, 7.0);
       curtains.forEach((c, i) => {
         const u = c.material.uniforms;
         const target = (i < nOn ? 1 : 0) * bright * (0.7 + 0.3 * Math.sin(t * 0.07 + i * 2.1));
         const ud = c.userData; ud.b = (ud.b ?? 0) + (target - (ud.b ?? 0)) * Math.min(1, dt * 0.4);
-        u.uB.value = ud.b * (1 + (i < nOn ? 0.55 * hooks.kick : 0)); // a Kp/Ap note briefly brightens the curtains
+        u.uB.value = ud.b * (1 + (i < nOn ? 0.35 * Math.min(1, hooks.kick) : 0)); // a Kp/Ap note briefly brightens the curtains
         u.uRed.value = red * (0.8 + 0.4 * (i / NC));
         // equatorward expansion: curtains come closer (higher in the sky) with Kp
         u.uZ.value = c.userData.z * (1.15 - 0.07 * kp);

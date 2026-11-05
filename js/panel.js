@@ -1,3 +1,4 @@
+import { autoMode } from './spatial.js';
 import { ORDER, SET_INFO, PRESETS, INSTS, LENS, METERS, SCALES, DELAYS, MODES, OCTS, SHIFTS, VOLS, PANS, BPMS, REV_MIX, REV_LEN, FBS, DMIX, noteColor, noteName } from './orchestra.js';
 
 // The collapsible "Orchestra" panel: transport, presets, rhythm, effects, and a mixer row per data set.
@@ -12,6 +13,27 @@ const fmtDur = (ms) => { const m = ms / 60e3; return m < 90 ? Math.round(m) + ' 
 const tsel = (key, opts, val, title) => `<label class="f"><span>${title}</span><select data-tl="${key}">${opts.map(([v, l]) => `<option value="${v}"${String(v) === String(val) ? ' selected' : ''}>${l}</option>`).join('')}</select></label>`;
 export function buildPanel(root, orch, opts) {
   const o = orch;
+  let testLabel = '';
+  const OUT = [['auto', 'Auto'], ['stereo', 'Stereo'], ['hrtf', 'Headphones 3D'], ['5.1', '5.1 surround'], ['7.1', '7.1 surround']];
+  const MODE_NAME = { stereo: 'Stereo', hrtf: 'Headphones 3D (HRTF)', '5.1': '5.1 surround (VBAP)', '7.1': '7.1 surround (VBAP)' };
+  function outSection() {
+    const info = o.outputInfo(), av = info.available, known = info.maxCh !== null;
+    const opt = ([v, l]) => {
+      const dis = (v === '5.1' || v === '7.1') && !av[v];
+      const lab = v === 'auto' && known ? `Auto (${MODE_NAME[autoMode(info.maxCh)]})` : l + (dis ? (known ? ' (not available)' : ' (start sound to detect)') : '');
+      return `<option value="${v}"${info.want === v ? ' selected' : ''}${dis ? ' disabled' : ''}>${lab}</option>`;
+    };
+    const now = info.mode ? `${MODE_NAME[info.mode]} · ${info.channels} ch (${info.order})` : 'starts with the sound';
+    return `<div class="o-tl o-out" id="o-out">
+        <div class="o-tl-h">Output <small>${known ? `this device reports ${info.maxCh} output channel${info.maxCh === 1 ? '' : 's'}` : 'channels are detected when sound starts'}</small></div>
+        <div class="o-row">
+          <label class="f"><span>Output</span><select data-out="1" id="o-out-sel">${OUT.map(opt).join('')}</select></label>
+          <button data-act="sptest" id="o-sptest">${o.testing ? '■ Stop test' : '♪ Speaker test'}</button>
+          <span class="o-sptest-l" id="o-sptest-l">${testLabel}</span>
+        </div>
+        <div class="o-tl-s">Now: ${now}. ${info.mode === 'hrtf' ? 'Use headphones: sounds sit where their data lives in the scene and move as you orbit and zoom.' : info.mode === '5.1' || info.mode === '7.1' ? 'Each voice is panned to the speakers from its place in the scene; the Schumann drone also feeds the subwoofer.' : 'Pan knobs set each voice. Pick Headphones 3D for spatial sound.'}</div>
+      </div>`;
+  }
   function render() {
     const solo = o.anySolo();
     root.innerHTML = `
@@ -46,6 +68,7 @@ export function buildPanel(root, orch, opts) {
         </div>
         <div class="o-tl-s">${o.N} steps · one step ≈ ${fmtDur(o.slotMs)} of real time${o.tl.eventMode ? ' (stretched near events)' : ''} · ${o.chains ? o.chains.length : 0} events on the timeline</div>
       </div>
+      ${outSection()}
       <div class="o-row o-toggles">
         <label><input type="checkbox" data-t="loop" ${o.loop ? 'checked' : ''}> Loop</label>
         <label><input type="checkbox" data-t="marker" ${o.marker ? 'checked' : ''}> Rotation marker</label>
@@ -82,6 +105,15 @@ export function buildPanel(root, orch, opts) {
     if (b.dataset.act === 'play') { if (o.playing) o.pause(); else await opts.play(); }
     else if (b.dataset.act === 'stop') o.stop();
     else if (b.dataset.act === 'close') { opts.close(); return; }
+    else if (b.dataset.act === 'sptest') {
+      if (o.testing) { o.testing = false; return; }
+      o.speakerTest((name, i, n) => {
+        testLabel = name ? `${i + 1}/${n}: <b>${name}</b>` : 'done';
+        const l = root.querySelector('#o-sptest-l'); if (l) l.innerHTML = testLabel;
+        const bt = root.querySelector('#o-sptest'); if (bt) bt.textContent = name ? '■ Stop test' : '♪ Speaker test';
+      });
+      render(); return;
+    }
     else if (b.dataset.preset) { o.applyPreset(b.dataset.preset); opts.changed(); }
     else if (b.dataset.ch) {
       const id = b.closest('.o-ch').dataset.id, k = b.dataset.ch; o.ch[id][k] = !o.ch[id][k];
@@ -93,6 +125,7 @@ export function buildPanel(root, orch, opts) {
   });
   root.addEventListener('change', (e) => {
     const t = e.target;
+    if (t.dataset.out) { o.setOutput(t.value); render(); return; }
     if (t.dataset.tl) { orch.tl[t.dataset.tl] = t.dataset.tl === 'barsPerDay' ? +t.value : t.value; orch.retime(); opts.changed(); render(); return; }
     if (t.dataset.tlc) { if (t.dataset.tlc === 'demo') opts.setDemo(t.checked); else { orch.tl.eventMode = t.checked; orch.retime(); opts.changed(); } render(); return; }
     if (t.dataset.t) { const k = t.dataset.t; if (k === 'loop' || k === 'marker') o[k] = t.checked; else opts.set(k, t.checked); return; }

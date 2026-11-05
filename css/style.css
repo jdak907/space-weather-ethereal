@@ -68,7 +68,15 @@ nav#picker button.active{border-color:var(--accent);color:#fff;background:rgba(4
 /* ---------- Orchestra panel + Bartels strip */
 #strip-wrap{position:absolute;top:58px;left:50%;transform:translateX(-50%);width:min(560px,calc(100vw - 520px));min-width:300px;padding:6px 8px 4px;background:var(--glass);border:1px solid rgba(255,255,255,.1);border-radius:8px;backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);transition:opacity 1.2s}
 #strip-wrap[hidden],#orch[hidden]{display:none}
-#strip{display:block;width:100%;height:110px}
+#strip{display:block;width:100%;height:110px;transition:height .45s ease}
+#strip-wrap{transition:opacity 1.2s,width .45s ease,left .45s ease,top .45s ease,bottom .45s ease,padding .45s ease;z-index:6}
+#strip-head{position:absolute;left:0;right:0;top:0;height:20px;cursor:zoom-in}
+#strip-wrap.big #strip-head{height:28px;cursor:zoom-out}
+#strip-size{position:absolute;right:4px;top:2px;width:22px;height:18px;padding:0;line-height:16px;font-size:13px;border-radius:5px;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.18);color:var(--fg,#dfe6f3);cursor:pointer}
+#strip-size:hover{background:rgba(255,255,255,.18)}
+#strip-wrap.big{width:min(1500px,calc(100vw - 48px));padding:10px 14px 8px;background:rgba(6,10,20,.86)}
+#strip-wrap.big #strip-size{width:30px;height:24px;font-size:16px;top:5px;right:8px}
+.about-inner .credit{font-size:15px;margin:-4px 0 12px}.about-inner .credit a{color:var(--accent)}
 #orch{position:absolute;top:58px;right:14px;width:min(440px,calc(100vw - 28px));max-height:calc(100vh - 310px);overflow:auto;padding:10px 12px 12px;background:rgba(8,12,22,.82);border:1px solid rgba(255,255,255,.14);border-radius:10px;backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);font-size:12.5px;z-index:5;overscroll-behavior:contain}
 #ui.idle #orch{opacity:1}
 body.orch-open #ui.idle{opacity:1}
@@ -111,7 +119,8 @@ body.orch-open #ui.idle{opacity:1}
   body.orch-open #caption,body.orch-open #readout,body.orch-open #strip-wrap{display:none}
   .o-sels{grid-template-columns:repeat(2,minmax(0,1fr))}
 }
-@media (min-width:1101px){body.orch-open #strip-wrap{left:calc(50% - 250px)}}
+@media (min-width:1101px){body.orch-open #strip-wrap{left:calc(50% - 250px)}body.orch-open #strip-wrap.big{left:calc((100vw - 470px) / 2 + 12px);width:calc(100vw - 500px)}}
+@media (max-width:1100px){#strip-wrap.big{top:58px;bottom:auto;left:12px;right:12px;width:auto;transform:none}}
 /* ---------- Schumann spectrum, chain-of-events HUD, demo banner, timeline markers */
 #sr-wrap{position:absolute;left:18px;top:62px;width:290px;padding:6px 8px;background:var(--glass);border:1px solid rgba(255,255,255,.1);border-radius:8px;backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);opacity:0;pointer-events:none;transition:opacity 1.2s}
 body.sr-on #sr-wrap{opacity:1;pointer-events:auto}
@@ -128,6 +137,7 @@ body.sr-on #sr-wrap{opacity:1;pointer-events:auto}
 #replay-bar .mk{z-index:0;position:absolute;top:2px;bottom:2px;width:3px;margin-left:-1px;border-radius:2px;opacity:.9;pointer-events:auto}
 .mk-flare{background:#ffd27a}.mk-sep{background:#ff6f9a}.mk-cme{background:#ff9a55}.mk-bzs{background:#ff5a4a}.mk-kp5{background:#5dffa0}
 .o-tl{margin:8px 0;padding:6px 8px;border:1px solid rgba(255,255,255,.08);border-radius:8px}
+.o-out .o-row{align-items:flex-end;gap:8px;flex-wrap:wrap}.o-out select{min-width:170px}.o-sptest-l{font-size:11.5px;color:var(--dim)}.o-sptest-l b{color:var(--accent)}
 .o-tl-h{color:var(--accent);font-size:12px;margin-bottom:2px}.o-tl-h small{color:var(--dim);font-size:10.5px}
 .o-tl-s{color:var(--dim);font-size:11px}
 body.orch-open #chain{right:auto;left:18px}

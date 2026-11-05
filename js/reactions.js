@@ -117,14 +117,15 @@ export function createReactions(scenes) {
           flash(F, d, col, 1.6, 1.8 + q * 0.3, H.sun, { grow: 1.2 });
         }
       } else if (n.id === 'kp' || n.id === 'ap') {
-        ring(F, new THREE.Vector3(), null, col, H.R * 1.05, H.R * (n.id === 'kp' ? 1.9 : 2.4), 2.4, { alpha: 0.3 });
+        // geomagnetic indices are Earth-side data: only a faint, occasional ripple on the Sun
+        if (n.j % 2 === 0) ring(F, new THREE.Vector3(), null, col, H.R * 1.05, H.R * (n.id === 'kp' ? 1.6 : 1.9), 2.0, { alpha: 0.1 });
       } else if (n.id === 'speed' || n.id === 'dens') {
         // a puff of wind leaving the corona
         const dir = new THREE.Vector3(Math.random() - 0.5, (Math.random() - 0.5) * 0.6, Math.random() - 0.5).normalize();
         flash(F, dir.clone().multiplyScalar(H.R), col, 3.5, 3.0, F.group, { grow: 1.3, move: (u, o) => o.position.copy(dir).multiplyScalar(H.R * (1.05 + 2.4 * u)) });
       } else if (n.id === 'bz') {
         const nrm = new THREE.Vector3(Math.random() - 0.5, Math.random() - 0.5, Math.random() - 0.5).normalize();
-        ring(F, new THREE.Vector3(), nrm, col, H.R * 1.1, H.R * 1.45, 2.0, { alpha: 0.3 });
+        ring(F, new THREE.Vector3(), nrm, col, H.R * 1.1, H.R * 1.4, 2.0, { alpha: 0.14 });
       }
     },
     wind(n, col, s) {
@@ -274,7 +275,7 @@ export function createReactions(scenes) {
     } else if (sc.id === 'oval') {
       big('kp', 1, { v: 7 }); if (sc.hooks) sc.hooks.kick = Math.min(1, (sc.hooks.kick || 0) + 0.5);
     } else if (sc.id === 'curtain') {
-      big('kp', 1, { v: 7 }); sc.hooks.kick = 1;
+      big('kp', 0.8, { v: 7 }); sc.hooks.kick = Math.min(0.7, (sc.hooks.kick || 0) + 0.5);
     } else if (sc.id === 'schumann') {
       const U = sc.hooks.U;
       if (st.fx === 'sid') U.uFlare.value = 1.0; else if (st.fx === 'sep') U.uPCA.value = 1.0; else U.uStorm.value = 1;

@@ -1,5 +1,7 @@
 # Space Weather Ethereal
 
+Created by Jeff Dumps · https://github.com/jdak907
+
 A slow, ambient Three.js journey along the chain of physics behind space weather: from the
 active Sun, through the solar wind and Earth's magnetic shield, down to the aurora. Every scene
 is driven by real measurements: the same data that plays in the Space Weather Sonifier.
@@ -59,6 +61,10 @@ playhead" in the panel to keep the latest conditions on screen instead.
 one 27-day Bartels rotation (or 6 hours for the solar wind sets), each stem is a reading, played
 stems keep their note color, and the current one glows. Pick the set in the panel; soloing a
 set switches the strip to it.
+The strip opens at its small (minimum) size. To enlarge it, click the ⤢ button in its corner,
+press **E**, or double-click its header. Enlarged, it spans most of the screen width (nearly
+full width on phones), with tall rows, day ticks, and big lit cells, so the note colors are easy
+to read. The same controls shrink it back. The size animates, and the page remembers it.
 
 **Tour follows solo:** with the tour on, soloing a set keeps the tour in that set's scenes
 (Kp and Ap go to the aurora scenes, F10.7 and sunspots to the Sun, wind speed and density to the
@@ -72,6 +78,49 @@ URL options:
 - `?quality=low` turns on reduced effects. Phones and touch devices get this automatically.
 - `?orch=1` opens the Orchestra panel. `?strip=0` hides the Bartels strip. `?follow=0` keeps the scenes on the latest data while music plays.
 - `?dwell=12` sets the tour's time per scene in seconds (default 42).
+
+## Spatial audio: stereo, headphones 3D, 5.1 and 7.1
+
+Pick the **Output** in the Orchestra panel: Auto, Stereo, Headphones 3D, 5.1 or 7.1. The choice is
+remembered on this device. **Speaker test** pings each channel in turn and shows its name.
+
+- **Stereo** (the fallback, and what Auto picks on ordinary speakers and phones): each voice uses
+  its Pan knob, as before.
+- **Headphones 3D:** every voice becomes a Web Audio `PannerNode` (`panningModel: 'HRTF'`, inverse
+  distance law) placed where its data lives in the scene on screen, and the listener rides the
+  camera every frame, so orbiting, panning and zooming move the sound. The Pan knobs do nothing in
+  this mode. Browsers cannot tell headphones from speakers, so Auto never turns this on by itself.
+- **5.1 / 7.1:** offered only when the browser reports enough output channels
+  (`AudioContext.destination.maxChannelCount` of at least 6 or 8; otherwise the options are greyed out).
+  The output is set to discrete channels, and each voice is panned with 2D vector-based amplitude
+  panning (VBAP) to the ITU speaker angles: L 30°, R −30°, C 0°, Ls 110°, Rs −110° for 5.1; side
+  90°/−90° and rear 135°/−135° for 7.1. Sources high overhead spread across all speakers. The
+  Schumann drone also feeds the subwoofer (LFE) through a 150 Hz low-pass at about −6 dB.
+- **Reverb and delay** stay shared: every voice sends to them before panning. Their return goes
+  to the front pair (stereo and 3D), or to the fronts plus the surrounds (5.1 and 7.1).
+
+| Scene | Where the voices sit |
+|---|---|
+| Sun | X-rays at the flaring region, sunspots at an active region, F10.7 at the disk, wind leaving the corona, Kp/Ap/Schumann off toward Earth |
+| Solar wind | Speed and density ride pulses out along the Parker spiral; Bz at the field near Earth; the Sun's sets at the Sun; Kp/Ap at Earth |
+| Magnetosphere | Wind at the bow-shock nose, Bz at the magnetopause nose, Kp and Ap over the north and south poles, Schumann at Earth, the Sun's sets far sunward |
+| UV oval | Kp on the midnight side of the oval, Ap at dawn, Bz at the dayside cusp, the Sun's sets toward the Sun (to the right) |
+| Aurora | Kp and Ap in the curtains, Bz overhead, wind high in the north, Schumann underfoot, the Sun's sets low in the south behind you |
+| Schumann | The drone over the busiest storm region, Kp/Ap at the poles, the Sun's sets toward the subsolar point |
+
+**How to hear it:**
+- **3D:** wear headphones (any kind) and choose *Headphones 3D*. Drag to orbit and scroll to
+  zoom, and the voices move around your head.
+- **Surround:** use Chrome or Edge on a desktop computer. Connect HDMI to an AV receiver (or use a
+  multichannel USB interface), and set the receiver to **multichannel PCM**, not a stereo
+  "upmix" mode. Set the computer's speaker configuration to 5.1 or 7.1 (Windows Sound settings, or
+  macOS Audio MIDI Setup). Reload the page, open the Orchestra panel, pick 5.1 or 7.1, and run
+  *Speaker test*.
+- Channel order: Web Audio's 6-channel order is L R C LFE SL SR. For 8 channels Chrome uses
+  L R C LFE BL BR SL SR (the back pair before the side pair; Chromium `media/base/channel_layout.cc`,
+  the same as the WAVE order). Whether your OS, driver and receiver route those to the right
+  speakers depends on the system. [VERIFY] it with Speaker test.
+- If a device reports more channels than it accepts, the page falls back to stereo.
 
 ## Schumann resonance (modeled)
 
@@ -190,6 +239,8 @@ python3 -m http.server 8931 &
 python3 tools/shoot.py            # desktop, writes screenshots/*.png
 python3 tools/shoot.py --mobile   # phone-sized viewport
 python3 tools/test_combo.py       # orchestra + reactions test, writes screenshots/combo-*.png
+python3 tools/test_spatial.py     # HRTF graph, listener follows camera, 2/6/8-channel logic, OfflineAudioContext channel energy
+node tools/test_time.mjs          # GMST/LST unit test
 python3 tools/record_tour.py http://localhost:8931/ 120   # silent tour video, screenshots/combo-tour.webm (convert to mp4 with ffmpeg)
 ```
 

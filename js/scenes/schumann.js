@@ -143,6 +143,7 @@ export function createSchumann(ctx) {
 
   // ---------- state
   const hooks = { boost: [0, 0, 0, 0, 0], col: [null, null, null, null, null], sferic, spec: null, U };
+  hooks.sunDir = sunDir; // for spatial audio (world-group coordinates)
   const st = { simT: Date.now(), lapse: true, s: null, D: null };
   const axis = new THREE.Vector3(...CENTERS[1]);
   let specAcc = 1;
@@ -209,7 +210,7 @@ export function createSchumann(ctx) {
       U.uTime.value = t; U.uI.value = s.I; U.uKp.value = P.kp;
       // the field pattern is centered on the busiest storm region (weighted by the model's regional shares)
       const want = new THREE.Vector3(); s.shares.forEach((w, r) => want.addScaledVector(new THREE.Vector3(...CENTERS[r]), w * w));
-      axis.lerp(want.normalize(), Math.min(1, dt * 0.8)).normalize(); U.uAxis.value.copy(axis);
+      axis.lerp(want.normalize(), Math.min(1, dt * 0.8)).normalize(); U.uAxis.value.copy(axis); hooks.axis = axis;
       for (let n = 0; n < 5; n++) {
         U.uPh.value[n] += dt * 2 * Math.PI * s.f[n] * 0.07;
         U.uA.value[n] = s.A[n] * 0.85;

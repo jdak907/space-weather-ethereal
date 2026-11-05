@@ -101,12 +101,56 @@ with sync_playwright() as p:
             for _ in range(40):
                 time.sleep(0.5)
                 if pg.evaluate("(sc) => { const s = window.__spacewx; return s.scenes[s.cur].id === sc && s.chainLog.some((x) => x.scene === sc) }", sc): break
-            time.sleep(1.2)
-            st = pg.evaluate("() => { const s = window.__spacewx; return { cur: s.scenes[s.cur].id, T: new Date(s.clockT()).toISOString(), log: s.chainLog.slice(-4).map((x) => x.type + ':' + x.fx + '@' + x.scene) } }")
+            # hold the playhead here so the next stage doesn't carry the tour away before the shot
+            pg.evaluate("() => { const s = window.__spacewx; s.orch.pause(); s.goQueue.length = 0; }")
+            time.sleep(1.5)
+            st = pg.evaluate("() => { const s = window.__spacewx; return { cur: s.scenes[s.cur].id, shown: s.scenes[s.shown].id, caption: document.getElementById('cap-title').textContent, captionOk: document.getElementById('cap-title').textContent === s.scenes[s.cur].title, T: new Date(s.clockT()).toISOString(), log: s.chainLog.slice(-4).map((x) => x.type + ':' + x.fx + '@' + x.scene) } }")
             pg.screenshot(path=os.path.join(a.out, name))
             out["shots"].append({"want": sc, "stage": info["label"], **st, "shot": name})
+            pg.evaluate("() => window.__spacewx.orch.play()")
         out["order"] = pg.evaluate("() => { const L = window.__spacewx.chainLog; let ok = true; for (let i = 1; i < L.length; i++) if (L[i].t < L[i-1].t && L[i].wall - L[i-1].wall < 1) ok = false; return { n: L.length, ok } }")
         report["timeline_demo"] = out; ctx.close()
+
+    # ---- Bartels strip enlarge / minimize, and the About credit
+    def newpage(vp=(1440, 900), mobile=False):
+        ctx = b.new_context(viewport={"width": vp[0], "height": vp[1]}, device_scale_factor=2 if mobile else 1, has_touch=mobile, is_mobile=mobile)
+        pg = ctx.new_page(); errs = []
+        pg.on("console", lambda m: errs.append(f"{m.type}: {m.text}") if m.type in ("error", "warning") else None)
+        pg.on("pageerror", lambda e: errs.append(f"pageerror: {e}"))
+        return ctx, pg, errs
+    STRIP = "() => { const w = document.getElementById('strip-wrap'), c = document.getElementById('strip'), r = w.getBoundingClientRect(); return { big: w.classList.contains('big'), w: Math.round(r.width), h: Math.round(r.height), canvasH: c.clientHeight, saved: localStorage.getItem('swe.stripBig'), label: document.getElementById('strip-size').getAttribute('aria-label') } }"
+    if not a.only or "bartels" in a.only:
+        for vp, mobile, shot in (((1440, 900), False, "bartels-enlarged.png"), ((390, 844), True, "bartels-enlarged-mobile.png")):
+            ctx, pg, errs = newpage(vp, mobile)
+            pg.goto(a.base + "?scene=sun&tour=0&live=%s" % a.live, wait_until="load")
+            pg.wait_for_function("() => window.__spacewx && window.__spacewx.orch.S", timeout=40000); time.sleep(2)
+            pg.evaluate("() => localStorage.removeItem('swe.stripBig')")
+            pg.click("#btn-sound"); time.sleep(5)
+            r = {"small": pg.evaluate(STRIP)}
+            pg.click("#strip-size"); time.sleep(1.5)
+            r["big"] = pg.evaluate(STRIP)
+            pg.screenshot(path=os.path.join(a.out, shot))
+            pg.reload(wait_until="load"); pg.wait_for_function("() => window.__spacewx && window.__spacewx.orch.S", timeout=40000); time.sleep(2)
+            r["afterReload"] = pg.evaluate(STRIP)
+            if not mobile:
+                pg.dblclick("#strip-head", position={"x": 40, "y": 8}); time.sleep(1.0); r["afterDblclick"] = pg.evaluate(STRIP)
+                pg.keyboard.press("e"); time.sleep(1.0); r["afterKeyE"] = pg.evaluate(STRIP)
+                pg.keyboard.press("e"); time.sleep(0.6)
+            r["ok"] = r["big"]["big"] and r["big"]["w"] >= r["small"]["w"] * (1.0 if mobile else 1.8) and r["big"]["canvasH"] > r["small"]["canvasH"] * 1.5 \
+                and r["afterReload"]["big"] and (mobile or (not r["afterDblclick"]["big"] and r["afterKeyE"]["big"]))
+            r["errors"] = errs
+            report["bartels_mobile" if mobile else "bartels"] = r; ctx.close()
+    if not a.only or "about" in a.only:
+        ctx, pg, errs = newpage()
+        pg.goto(a.base + "?scene=oval&tour=0&live=%s" % a.live, wait_until="load")
+        pg.wait_for_function("() => window.__spacewx && window.__spacewx.orch.S", timeout=40000); time.sleep(2)
+        pg.click("#btn-info"); time.sleep(0.8)
+        r = pg.evaluate("""() => { const a = document.getElementById('about'), t = a.innerText, l = a.querySelector('.credit a');
+          return { visible: !a.hidden, credit: a.querySelector('.credit') && a.querySelector('.credit').innerText, href: l && l.href,
+            hasEmail: /[\\w.+-]+@[\\w-]+\\.[\\w.]+/.test(t) || !!a.querySelector('a[href^="mailto:"]'), hasPhone: /\\+?\\d[\\d ().-]{8,}\\d/.test(t.replace(/\\d{4}-\\d{2}-\\d{2}/g, '')) || !!a.querySelector('a[href^="tel:"]') } }""")
+        r["ok"] = r["visible"] and r["credit"] and "Created by Jeff Dumps" in r["credit"] and r["href"] == "https://github.com/jdak907" and not r["hasEmail"] and not r["hasPhone"]
+        pg.screenshot(path=os.path.join(a.out, "about.png"))
+        r["errors"] = errs; report["about"] = r; ctx.close()
 
     if not a.only or "mobile" in a.only:
         run("mobile", "?scene=curtain&tour=0&orch=1&live=%s" % a.live, lambda pg: pg.click("#orch .o-play"), [6], ["combo-mobile-panel.png"], vp=(390, 844), mobile=True)

@@ -149,7 +149,7 @@ export function createSun(ctx) {
   let flare = { t: -99, idx: 0, dur: 9 }, nextFlare = 6, lastT = 0, curNar = 4;
   // hooks for the orchestra: notes can light a specific active region
   const hooks = {
-    sun, ar, R, nar: () => curNar,
+    sun, ar, R, nar: () => curNar, flareIdx: () => flare.idx,
     flare(idx, dur = 4) { const ft = (lastT - flare.t) / flare.dur; if (ft < 0 || ft >= 0.5) flare = { t: lastT, idx: idx % curNar, dur }; },
   };
 

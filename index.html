@@ -42,6 +42,7 @@
   <section id="readout" aria-label="Current values"></section>
 
   <div id="strip-wrap" hidden title="Bartels light-up strip: each row is one 27-day solar rotation; the glowing stem is the reading being played, in its note color">
+    <div id="strip-head" title="Double-click to enlarge or minimize"><button id="strip-size" aria-label="Enlarge Bartels strip" aria-pressed="false" title="Enlarge (E, or double-click the header)">⤢</button></div>
     <canvas id="strip" aria-label="Bartels light-up strip"></canvas>
   </div>
 
@@ -66,6 +67,7 @@
   <div class="about-inner">
     <button id="about-close" aria-label="Close">×</button>
     <h2>About this piece</h2>
+    <p class="credit">Created by <b>Jeff Dumps</b> · <a href="https://github.com/jdak907" target="_blank" rel="noopener">github.com/jdak907</a></p>
     <p>A slow, ambient tour of the chain of physics behind space weather: the Sun's activity, the solar wind it blows across the solar system, Earth's magnetic shield, the aurora where that energy lands in our upper atmosphere, and the Schumann resonances: the whole planet's electromagnetic ringing, driven by lightning.</p>
     <p><b>Measured data</b> drives every scene: the Kp and Ap geomagnetic indices, F10.7 solar radio flux, sunspot number, and the solar wind speed, density, and magnetic field direction (Bz) measured upstream of Earth at the L1 point.</p>
     <p><b>One timeline.</b> Every data set sits on one UTC clock as experienced at Earth. Solar wind measured at the L1 point is shifted to when it reaches Earth (1.41 million km ÷ its measured speed, about 30 to 60 minutes). The Sun scene shows the Sun 8.3 minutes earlier, when the light left it. When the playhead passes a flare, proton event, southward Bz, or storm, the scenes show the cause first and then each effect after its physical delay, and the tour follows the chain.</p>
@@ -85,7 +87,7 @@
     <p>Every time is shown three ways: your local time (with its zone), UTC, and Greenwich Mean Sidereal Time (GMST, star time at Greenwich). For Local Sidereal Time, type your longitude (east positive, west negative). Your location is never requested.</p>
     <p><label>Longitude for LST: <input id="lon-in" type="number" step="0.01" min="-180" max="180" placeholder="e.g. -147.72" style="width:9em"></label> <span id="lon-note" class="small"></span></p>
     <h3>Controls</h3>
-    <p>Drag to orbit, scroll or pinch to zoom. Keys: ← → or 1–6 change scene, T tour, R replay, S sound (play/pause the orchestra), O orchestra panel, B Bartels strip, H hide text, I about.</p>
+    <p>Drag to orbit, scroll or pinch to zoom. Keys: ← → or 1–6 change scene, T tour, R replay, S sound (play/pause the orchestra), O orchestra panel, B Bartels strip, E enlarge or minimize the strip (or double-click its header), H hide text, I about.</p>
     <p class="small">Made with Three.js. Code under the MIT License.</p>
   </div>
 </div>
