@@ -19,6 +19,7 @@ import { createReactions } from './reactions.js';
 import { BartelsStrip } from './strip.js';
 import { buildPanel } from './panel.js';
 import * as spatial from './spatial.js';
+import { loadEarth, setEarthAnisotropy, earthStatus } from './earthtex.js';
 import { airplaySupported, watchAirPlay, mkAudio, OUT_ID, unlockStats } from './audiounlock.js';
 
 // Colors are authored directly in display space; no color-space conversion anywhere.
@@ -48,6 +49,8 @@ renderer.outputColorSpace = THREE.LinearSRGBColorSpace;
 renderer.toneMapping = THREE.NoToneMapping;
 
 // ---------- scenes
+// real Earth imagery (NASA Blue Marble / Black Marble, served from assets/): 2K on phones, 4K elsewhere
+loadEarth({ low }); setEarthAnisotropy(renderer.capabilities.getMaxAnisotropy());
 const ctx = { pr: Q.pr, particles: Q.particles, stars: Q.stars, mobile: Q.mobile };
 const scenes = [createSun(ctx), createWind(ctx), createMagneto(ctx), createOval(ctx), createCurtain(ctx), createSchumann(ctx)];
 const byId = Object.fromEntries(scenes.map((s, i) => [s.id, i]));
@@ -578,5 +581,5 @@ function setDemo(on) {
     lonIn.addEventListener('change', () => { const x = lonIn.value.trim(); setLon(x === '' ? null : x); setBadge(); readout(); drawMarkers(); drawHUD(); $('lon-note').textContent = getLon() === null ? 'Showing GMST only.' : `Showing LST for ${getLon()}°.`; });
   }
   if (params.get('orch') === '1') toggleOrch(true);
-  window.__spacewx = { spatial, THREE, unlockStats, setStripBig, goQueue, get shown() { return shown; }, get D() { return D; }, P, scenes, go, orch, reactions, strip, opt, chainLog, setDemo, clockT, get cur() { return cur; }, get playK() { return playK; } };
+  window.__spacewx = { spatial, THREE, unlockStats, earthTex: { status: earthStatus }, setStripBig, goQueue, get shown() { return shown; }, get D() { return D; }, P, scenes, go, orch, reactions, strip, opt, chainLog, setDemo, clockT, get cur() { return cur; }, get playK() { return playK; } };
 })();

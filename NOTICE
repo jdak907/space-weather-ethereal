@@ -1,0 +1,10 @@
+Space Weather Ethereal
+Copyright (c) Jeff Dumps. Code under the MIT License (see LICENSE).
+
+Third-party content:
+- Earth imagery in assets/: NASA Earth Observatory, Blue Marble: Next Generation (Reto Stöckli; topography and
+  bathymetry shading by Jesse Allen using GEBCO data) and Black Marble 2016 (Joshua Stevens, Suomi NPP VIIRS data
+  from Miguel Román, NASA GSFC). NASA imagery is not copyrighted in the United States; credit NASA. See assets/README.md.
+- Land mask in js/landmask.js: Natural Earth 1:110m land, public domain.
+- three.js (MIT License), loaded from jsDelivr.
+- Space weather data: NOAA SWPC (public domain) and GFZ Potsdam (see README.md for terms).

@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { NOISE } from '../glsl.js';
 import { makeStars, makeNebula } from '../stars.js';
 import { LAND_W, LAND_H } from '../landmask.js';
+import { EARTH_U, EARTH_GLSL } from '../earthtex.js';
 import { land, srAt, srSpectrum, sampleStorm, diurnal, geo, subsolar, REGIONS, SR_F0 } from '../schumann.js';
 
 // Scene 6: the Earth-ionosphere cavity and its Schumann resonances (MODELED, see js/schumann.js).
@@ -26,15 +27,17 @@ export function createSchumann(ctx) {
     uTime: { value: 0 }, uSun: { value: sunDir }, uLand: { value: tex }, uFlare: { value: 0 }, uPCA: { value: 0 }, uStorm: { value: 0 },
     uA: { value: [1, 0.7, 0.5, 0.35, 0.25] }, uPh: { value: [0, 0, 0, 0, 0] }, uHi: { value: [0, 0, 0, 0, 0] },
     uAxis: { value: new THREE.Vector3(...CENTERS[1]) }, uHiCol: { value: new THREE.Color(1, 1, 1) }, uI: { value: 1 }, uKp: { value: 2 },
+    ...EARTH_U,
   };
   const geoGLSL = /* glsl */`
     vec2 lonlat(vec3 p){ return vec2(atan(-p.z, p.x), asin(clamp(p.y,-1.0,1.0))); }`;
   // ---------- Earth
   const earth = new THREE.Mesh(new THREE.SphereGeometry(1, 128, 64), new THREE.ShaderMaterial({
     uniforms: U,
-    vertexShader: `varying vec3 vP; varying vec3 vN; varying vec3 vV; void main(){ vP=normalize(position); vN=normalize(mat3(modelMatrix)*normal); vec4 w=modelMatrix*vec4(position,1.0); vV=normalize(cameraPosition-w.xyz); gl_Position=projectionMatrix*viewMatrix*w; }`,
-    fragmentShader: NOISE + geoGLSL + /* glsl */`
-      uniform sampler2D uLand; uniform vec3 uSun; uniform float uTime, uFlare; varying vec3 vP; varying vec3 vN; varying vec3 vV;
+    vertexShader: `varying vec3 vP; varying vec3 vN; varying vec3 vV; varying vec2 vUv; varying vec3 vVl; void main(){ vUv=uv; vP=normalize(position); vN=normalize(mat3(modelMatrix)*normal); vec4 w=modelMatrix*vec4(position,1.0); vV=normalize(cameraPosition-w.xyz);
+      vVl = normalize((inverse(modelMatrix)*vec4(cameraPosition,1.0)).xyz - position); gl_Position=projectionMatrix*viewMatrix*w; }`,
+    fragmentShader: NOISE + geoGLSL + EARTH_GLSL + /* glsl */`
+      uniform sampler2D uLand; uniform vec3 uSun; uniform float uTime, uFlare; varying vec3 vP; varying vec3 vN; varying vec3 vV; varying vec2 vUv; varying vec3 vVl;
       void main(){
         vec2 ll = lonlat(vP);
         vec2 uv = vec2((ll.x + 3.14159265)/6.2831853, (1.5707963 - ll.y)/3.14159265);
@@ -51,6 +54,9 @@ export function createSchumann(ctx) {
         float day = smoothstep(-0.1, 0.25, d);
         vec3 col = c*(0.05 + 0.72*day);
         col += vec3(1.0,0.65,0.3) * landM * (1.0-day) * smoothstep(0.6,0.8, snoise(vP*55.0)) * 0.12; // faint city lights
+        // real Earth (NASA Blue Marble), a little dimmer so the cavity modes and lightning stay readable
+        // (sphere uv: same lon/lat as the land mask above, seamless; lighting in the globe's own frame)
+        if (uEarthOn > 0.5) col = earthLit(vUv, normalize(vP), normalize(uSun), normalize(vVl), 0.62, 0.05);
         float rim = pow(1.0 - max(dot(normalize(vN), normalize(vV)),0.0), 3.0);
         col += vec3(0.25,0.5,1.0) * rim * (0.12 + 0.6*max(d+0.2,0.0));
         gl_FragColor = vec4(col, 1.0);
@@ -94,7 +100,8 @@ export function createSchumann(ctx) {
   // ---------- ionosphere shell (the cavity ceiling): dayside brighter; flares, protons and storms light it
   const ion = new THREE.Mesh(new THREE.SphereGeometry(ION_R, 96, 48), new THREE.ShaderMaterial({
     uniforms: U, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide,
-    vertexShader: `varying vec3 vP; varying vec3 vN; varying vec3 vV; void main(){ vP=normalize(position); vN=normalize(mat3(modelMatrix)*normal); vec4 w=modelMatrix*vec4(position,1.0); vV=normalize(cameraPosition-w.xyz); gl_Position=projectionMatrix*viewMatrix*w; }`,
+    vertexShader: `varying vec3 vP; varying vec3 vN; varying vec3 vV; varying vec2 vUv; varying vec3 vVl; void main(){ vUv=uv; vP=normalize(position); vN=normalize(mat3(modelMatrix)*normal); vec4 w=modelMatrix*vec4(position,1.0); vV=normalize(cameraPosition-w.xyz);
+      vVl = normalize((inverse(modelMatrix)*vec4(cameraPosition,1.0)).xyz - position); gl_Position=projectionMatrix*viewMatrix*w; }`,
     fragmentShader: NOISE + /* glsl */`
       uniform vec3 uSun; uniform float uTime, uFlare, uPCA, uStorm, uKp; varying vec3 vP; varying vec3 vN; varying vec3 vV;
       void main(){

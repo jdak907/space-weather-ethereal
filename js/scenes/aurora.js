@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { EARTH_U, EARTH_GLSL } from '../earthtex.js';
 import { NOISE, rng } from '../glsl.js';
 import { makeStars } from '../stars.js';
 
@@ -16,16 +17,16 @@ export function createOval(ctx) {
   const camera = new THREE.PerspectiveCamera(40, 1, 0.1, 5000);
   camera.position.set(0, 34, 8);
   const RE = 8;
-  const U = { uTime: { value: 0 }, uKp: { value: 2 }, uSpin: { value: 0 }, uSub: { value: 0 } };
+  const U = { uTime: { value: 0 }, uKp: { value: 2 }, uSpin: { value: 0 }, uSub: { value: 0 }, ...EARTH_U };
   const mat = new THREE.ShaderMaterial({
     uniforms: U,
     vertexShader: /* glsl */`
-      varying vec3 vP; varying vec3 vN; varying vec3 vV;
-      void main(){ vP = normalize(position); vN = normalize(mat3(modelMatrix)*normal);
+      varying vec3 vP; varying vec3 vN; varying vec3 vV; varying vec2 vUv;
+      void main(){ vUv = uv; vP = normalize(position); vN = normalize(mat3(modelMatrix)*normal);
         vec4 w = modelMatrix*vec4(position,1.0); vV = normalize(cameraPosition-w.xyz);
         gl_Position = projectionMatrix*viewMatrix*w; }`,
-    fragmentShader: NOISE + /* glsl */`
-      uniform float uTime, uKp, uSpin, uSub; varying vec3 vP; varying vec3 vN; varying vec3 vV;
+    fragmentShader: NOISE + EARTH_GLSL + /* glsl */`
+      uniform float uTime, uKp, uSpin, uSub; varying vec3 vP; varying vec3 vN; varying vec3 vV; varying vec2 vUv;
       vec3 uvi(float x){ // black-purple-blue-cyan-green-yellow-red-white false-color bar
         x = clamp(x, 0.0, 1.0);
         vec3 c = mix(vec3(0.0), vec3(0.28,0.0,0.45), smoothstep(0.0,0.12,x));
@@ -58,12 +59,19 @@ export function createOval(ctx) {
         float dayglow = 0.30*smoothstep(-0.1, 0.9, sza);
         float v = dayglow + aur;
         vec3 col = uvi(v);
-        // faint procedural "coastlines" and magnetic latitude grid, as overlaid on UV images
-        float cs = cos(uSpin), sn = sin(uSpin);
-        vec3 g = vec3(cs*vP.x - sn*vP.z, vP.y, sn*vP.x + cs*vP.z);
-        float h = fbm(g*1.8 + 3.0);
-        float coast = 1.0 - smoothstep(0.0, 0.006, abs(h - 0.05));
-        col += vec3(0.5)*coast*0.16;
+        // coastlines and magnetic latitude grid, as overlaid on UV images (real coastlines from the
+        // NASA Blue Marble water mask once it has loaded; procedural before that)
+        float coast;
+        if (uEarthOn > 0.5) {
+          float w = earthAux(vec2(vUv.x - uSpin/6.2831853, vUv.y)).x;
+          coast = 1.0 - smoothstep(0.0, 1.6*fwidth(w) + 1e-4, abs(w - 0.5));
+        } else {
+          float cs = cos(uSpin), sn = sin(uSpin);
+          vec3 g = vec3(cs*vP.x - sn*vP.z, vP.y, sn*vP.x + cs*vP.z);
+          float h = fbm(g*1.8 + 3.0);
+          coast = 1.0 - smoothstep(0.0, 0.006, abs(h - 0.05));
+        }
+        col += vec3(0.5)*coast*0.2;
         float grid = 0.0;
         for (int k=5;k<=8;k++){ grid += 1.0 - smoothstep(0.0, 0.18, abs(lat - float(k)*10.0)); }
         float mer = (1.0 - smoothstep(0.0, 0.006, abs(vP.z))) * step(lat, 85.0);

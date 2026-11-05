@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { NOISE, rng } from '../glsl.js';
 import { makeStars, makeNebula } from '../stars.js';
+import { EARTH_U, EARTH_GLSL } from '../earthtex.js';
 
 // Scene 2: the solar wind streaming from the Sun past Earth, with the Parker spiral.
 // Spiral pitch uses the real relation tan(psi) = Omega_sun * r / v (about 45 degrees at 1 AU
@@ -115,13 +116,16 @@ export function createWind(ctx) {
   // --- Earth with a hint of its magnetic bubble, and Earth's orbit
   const earth = new THREE.Group(); earth.position.set(AU, 0, 0); scene.add(earth);
   earth.add(new THREE.Mesh(new THREE.SphereGeometry(1.4, 48, 24), new THREE.ShaderMaterial({
-    uniforms: { uSun: { value: new THREE.Vector3(-1, 0, 0) } },
-    vertexShader: `varying vec3 vN; varying vec3 vW; void main(){ vN=normalize(mat3(modelMatrix)*normal); vW=normalize(position); gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0);} `,
-    fragmentShader: NOISE + `uniform vec3 uSun; varying vec3 vN; varying vec3 vW; void main(){
-      float land = smoothstep(0.05,0.12,fbm3(vW*2.2));
-      vec3 c = mix(vec3(0.05,0.18,0.45), vec3(0.22,0.35,0.2), land);
-      float d = max(dot(vN,uSun),0.0); float rim = pow(max(1.0-abs(vN.z),0.0),3.0);
-      gl_FragColor = vec4(c*(0.12+1.1*d) + vec3(0.3,0.55,1.0)*0.25*d, 1.0);} `,
+    uniforms: { uSun: { value: new THREE.Vector3(-1, 0, 0) }, ...EARTH_U },
+    vertexShader: `varying vec3 vN; varying vec3 vW; varying vec2 vUv; varying vec3 vV; void main(){ vUv=uv; vN=normalize(mat3(modelMatrix)*normal); vW=normalize(position);
+      vec4 w=modelMatrix*vec4(position,1.0); vV=normalize(cameraPosition-w.xyz); gl_Position=projectionMatrix*viewMatrix*w;} `,
+    fragmentShader: NOISE + EARTH_GLSL + `uniform vec3 uSun; varying vec3 vN; varying vec3 vW; varying vec2 vUv; varying vec3 vV; void main(){
+      vec3 N = normalize(vN); float d = max(dot(N,uSun),0.0);
+      vec3 col;
+      if (uEarthOn > 0.5) col = earthLit(vUv, N, uSun, normalize(vV), 1.0, 0.10);   // real Earth (NASA Blue Marble)
+      else { float land = smoothstep(0.05,0.12,fbm3(vW*2.2)); col = mix(vec3(0.05,0.18,0.45), vec3(0.22,0.35,0.2), land)*(0.12+1.1*d); }
+      float rim = pow(1.0 - max(dot(N, normalize(vV)), 0.0), 3.0);
+      gl_FragColor = vec4(col + vec3(0.3,0.55,1.0)*(0.08*d + 0.3*rim*(0.2+d)), 1.0);} `,
   })));
   const shockMat = new THREE.ShaderMaterial({
     uniforms: { uFade: U.uFade, uTime: U.uTime },
