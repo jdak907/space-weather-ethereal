@@ -9,6 +9,9 @@ import { ovalEdge } from './scenes/aurora.js';
 //   wind speed, density -> glowing pulses ride the Parker spiral from the Sun to Earth
 //   Bz -> ripples run along the magnetopause / the field near Earth
 //   Kp, Ap -> the auroral oval and curtains brighten
+//   X-rays -> a flare on the Sun; the dayside ionosphere lights up elsewhere
+//   Schumann (modeled) -> the cavity's mode patterns and spectrum peaks swell; a faint hum of light elsewhere
+// Chain-of-events stages (js/timeline.js) call stage(), which makes a bigger, labeled version.
 
 let glowTex = null;
 function tex() {
@@ -31,7 +34,7 @@ export function noteColor3(midi, boost = 1.6) {
 class FX {
   constructor(sceneDef) {
     this.s = sceneDef; this.group = new THREE.Group(); this.group.renderOrder = 10;
-    sceneDef.scene.add(this.group); this.live = []; this.sprites = []; this.rings = []; this.points = [];
+    (sceneDef.world || sceneDef.scene).add(this.group); this.live = []; this.sprites = []; this.rings = []; this.points = [];
   }
   sprite(parent = this.group) {
     let sp = this.sprites.find((x) => !x.userData.busy);
@@ -99,6 +102,9 @@ export function createReactions(scenes) {
   const R = {
     sun(n, col, s) {
       const F = fx.sun, H = s.hooks, nar = H.nar(), str = 0.6 + 0.6 * n.vel;
+      if (n.id === 'sr') { if (n.j % 4 === 0) ring(F, new THREE.Vector3(), null, col, H.R * 1.02, H.R * 1.08, 1.6, { alpha: 0.05 }); return; } // Schumann barely touches the Sun scene
+      if (n.id === 'xr') { const i = (Math.floor(n.T / 3600e3) * 5) % nar; const p = H.ar[i].clone().multiplyScalar(H.R * 1.03);
+        flash(F, p, col, 7 * str, 2.2, H.sun, { grow: 1.6 }); if (n.v >= -5) H.flare(i, 3 + 4 * Math.min(1, n.v + 5)); return; }
       if (n.id === 'f107' || n.id === 'sn') {
         // an active region lights up; F10.7 also triggers a flare there
         const i = (n.j * 7 + (n.id === 'sn' ? 3 : 0)) % nar;
@@ -124,6 +130,8 @@ export function createReactions(scenes) {
     wind(n, col, s) {
       const F = fx.wind, H = s.hooks, AU = H.AU, k = H.U.uK.value;
       const along = (c0, r) => { const phi = c0 + k * (AU - r); return new THREE.Vector3(Math.cos(phi) * r, 0, Math.sin(phi) * r); };
+      if (n.id === 'sr') { flash(F, new THREE.Vector3(AU, 0, 0), col, 2.2, 2.4, F.group, { alpha: 0.25, grow: 1.2 }); return; }
+      if (n.id === 'xr') { ring(F, new THREE.Vector3(), null, col, H.RS * 1.5, AU * 1.05, 1.6, { alpha: 0.3 }); return; } // light-speed front
       if (n.id === 'speed' || n.id === 'dens') {
         // pulse riding the spiral field line that reaches Earth (speed) or a neighbor line (density)
         const c0 = n.id === 'speed' ? 0 : ((rr++ % 6) - 2.5) * 0.18;
@@ -150,6 +158,8 @@ export function createReactions(scenes) {
     magneto(n, col, s) {
       const F = fx.magneto, st = s.state;
       const mp = (th) => st.r0 * Math.pow(2 / (1 + Math.cos(th)), st.a);
+      if (n.id === 'sr') { ring(F, new THREE.Vector3(), null, col, 1.05, 1.35, 2.2, { alpha: 0.35 }); return; }
+      if (n.id === 'xr') { flash(F, new THREE.Vector3(0.9, 0, 0), col, 2.4, 1.6, F.group, { alpha: 0.4 }); return; }
       if (n.id === 'bz') {
         // ripple running from the nose of the magnetopause down the flanks
         ring(F, new THREE.Vector3(st.r0, 0, 0), X, col, 0.3, 1, 3.2, { alpha: 0.95,
@@ -175,6 +185,8 @@ export function createReactions(scenes) {
     oval(n, col, s) {
       const F = fx.oval, H = s.hooks, RE = H.RE;
       const onSphere = (latDeg, mlt, rr2 = 1.012) => { const la = THREE.MathUtils.degToRad(latDeg); return new THREE.Vector3(Math.cos(la) * Math.cos(mlt), Math.sin(la), Math.cos(la) * Math.sin(mlt)).multiplyScalar(RE * rr2); };
+      if (n.id === 'sr') { flash(F, onSphere(5, (Math.random() - 0.5) * 2.4, 1.0), col, 1.4, 1.6, F.group, { alpha: 0.4 }); return; } // a far-off tropical storm
+      if (n.id === 'xr') { flash(F, new THREE.Vector3(RE * 1.02, 0, 0), col, RE * 0.7, 2.0, F.group, { alpha: 0.15, grow: 1.1 }); return; }
       if (n.id === 'kp' || n.id === 'ap') {
         const kp = s.hooks.U.uKp.value;
         const pts = [];
@@ -198,6 +210,8 @@ export function createReactions(scenes) {
     },
     curtain(n, col, s) {
       const F = fx.curtain, H = s.hooks;
+      if (n.id === 'sr') { const ang = (Math.random() - 0.5) * 2.6; flash(F, new THREE.Vector3(Math.sin(ang) * 600, 8, -Math.cos(ang) * 600), col, 40, 0.9, F.group, { alpha: 0.35 }); return; } // distant lightning on the horizon
+      if (n.id === 'xr') { flash(F, new THREE.Vector3(0, 420, -200), col, 140, 2.0, F.group, { alpha: 0.06, grow: 1.1 }); return; }
       if (n.id === 'kp' || n.id === 'ap') {
         H.kick = Math.min(1, H.kick + 0.25 * n.vel); if (H.tint.r + H.tint.g + H.tint.b < 0.15) H.tint.add(col.clone().multiplyScalar(0.025));
         // a vertical ray inside one of the visible curtains
@@ -218,10 +232,59 @@ export function createReactions(scenes) {
         flash(F, new THREE.Vector3(0, 420, -200), col, 160, 3.2, F.group, { alpha: 0.1, grow: 1.1 });
       }
     },
+    schumann(n, col, s) {
+      const F = fx.schumann, H = s.hooks, U = H.U, ax = U.uAxis.value.clone().normalize();
+      const css = '#' + col.clone().multiplyScalar(1 / 1.6).getHexString();
+      if (n.id === 'sr') {
+        // the modes this note sounds swell, in its color; a sferic races around from the main storm region
+        for (let k = 0; k < Math.max(1, n.modes || 1); k++) { H.boost[k] = Math.min(0.9, H.boost[k] + 0.55 * n.vel * (k === (n.modes || 1) - 1 ? 1.4 : 0.6)); H.col[k] = css; }
+        U.uHiCol.value.copy(col).multiplyScalar(0.6);
+        H.sferic(ax, col, 2.4, 0.32);
+      } else if (n.id === 'xr') {
+        U.uFlare.value = Math.min(1.2, U.uFlare.value + 0.25 * n.vel);
+        flash(F, U.uSun.value.clone().multiplyScalar(1.12), col, 0.5, 1.6, F.group, { alpha: 0.5, grow: 1.6 });
+      } else if (n.id === 'kp' || n.id === 'ap') {
+        for (const sg of [1, -1]) ring(F, new THREE.Vector3(0, sg * 1.04, 0), UP, col, 0.3, 0.55, 2.4, { alpha: 0.7 });
+      } else if (n.id === 'f107' || n.id === 'sn') {
+        flash(F, U.uSun.value.clone().multiplyScalar(1.13), col, 0.9, 2.6, F.group, { alpha: 0.25, grow: 1.2 });
+      } else {
+        ring(F, new THREE.Vector3(), null, col, 1.12, 1.3, 1.8, { alpha: 0.35 });
+      }
+    },
   };
+  // ---- chain-of-events stages: a bigger, longer version of the matching reaction, in a fixed "event" color
+  const STAGE_COL = { flare: [1, 0.85, 0.5], cme: [1, 0.6, 0.35], sid: [0.85, 0.8, 1], sep: [1, 0.4, 0.6], pca: [1, 0.4, 0.6], bz: [1, 0.35, 0.3],
+    reconnect: [1, 0.45, 0.35], shock: [1, 0.7, 0.4], expand: [0.35, 1, 0.6], substorm: [0.4, 1, 0.6], storm: [0.5, 1, 0.65] };
+  function stage(st, sc) {
+    const col = new THREE.Color(...(STAGE_COL[st.fx] || [1, 1, 1])).multiplyScalar(1.8);
+    const F = fx[sc.id]; if (!F) return;
+    const big = (id, vel, extra = {}) => { const n = { id, midi: 60, v: extra.v ?? 0, j: 3, vel, T: st.t, modes: 5, ...extra }; for (let q = 0; q < 3; q++) setTimeout(() => { try { R[sc.id](n, col, sc); } catch (_e) { /* scene busy */ } }, q * 260); };
+    if (sc.id === 'sun') {
+      const H = sc.hooks, i = 1 % H.nar(); H.flare(i, 9);
+      flash(F, H.ar[i].clone().multiplyScalar(H.R * 1.04), col, 22, 4, H.sun, { grow: 1.8 });
+      if (st.fx === 'cme') for (let q = 0; q < 3; q++) ring(F, new THREE.Vector3(), null, col, H.R * 1.1, H.R * (3 + q), 5 + q, { alpha: 0.45 });
+    } else if (sc.id === 'wind') {
+      const H = sc.hooks, AU = H.AU;
+      if (st.fx === 'cme') ring(F, new THREE.Vector3(), UP, col, AU * 0.2, AU * 1.15, 6, { alpha: 0.7 });
+      else big('bz', 1, { v: -15 });
+      big(st.fx === 'cme' ? 'speed' : 'dens', 1, { v: 700 });
+    } else if (sc.id === 'magneto') {
+      big('bz', 1, { v: -15 }); big('speed', 1, { v: 700 });
+      flash(F, new THREE.Vector3(sc.state.r0, 0, 0), col, 9, 3.5, F.group, { alpha: 0.6, grow: 1.6 });
+    } else if (sc.id === 'oval') {
+      big('kp', 1, { v: 7 }); if (sc.hooks) sc.hooks.kick = Math.min(1, (sc.hooks.kick || 0) + 0.5);
+    } else if (sc.id === 'curtain') {
+      big('kp', 1, { v: 7 }); sc.hooks.kick = 1;
+    } else if (sc.id === 'schumann') {
+      const U = sc.hooks.U;
+      if (st.fx === 'sid') U.uFlare.value = 1.0; else if (st.fx === 'sep') U.uPCA.value = 1.0; else U.uStorm.value = 1;
+      big('sr', 1, { v: 1 });
+    }
+    stats.stages = (stats.stages || 0) + 1;
+  }
 
   return {
-    stats, fx,
+    stats, fx, stage,
     // fire a note's reaction in each of the given scenes (current, plus the incoming one during a fade)
     note(n, active) {
       const col = noteColor3(n.midi);

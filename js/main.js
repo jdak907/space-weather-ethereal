@@ -10,6 +10,10 @@ import { createSun } from './scenes/sun.js';
 import { createWind } from './scenes/wind.js';
 import { createMagneto, shue } from './scenes/magneto.js';
 import { createOval, createCurtain, ovalEdge } from './scenes/aurora.js';
+import { createSchumann } from './scenes/schumann.js';
+import { srAt, srSeries } from './schumann.js';
+import { fmt3, setCompact, getLon, setLon } from './time.js';
+import { shiftWind, demoData, DELAYS, l1DelayMin, xcls } from './timeline.js';
 import { Orchestra, noteColor, noteName, SET_INFO } from './orchestra.js';
 import { createReactions } from './reactions.js';
 import { BartelsStrip } from './strip.js';
@@ -43,7 +47,7 @@ renderer.toneMapping = THREE.NoToneMapping;
 
 // ---------- scenes
 const ctx = { pr: Q.pr, particles: Q.particles, stars: Q.stars, mobile: Q.mobile };
-const scenes = [createSun(ctx), createWind(ctx), createMagneto(ctx), createOval(ctx), createCurtain(ctx)];
+const scenes = [createSun(ctx), createWind(ctx), createMagneto(ctx), createOval(ctx), createCurtain(ctx), createSchumann(ctx)];
 const byId = Object.fromEntries(scenes.map((s, i) => [s.id, i]));
 
 // one OrbitControls per scene camera; only the active one is enabled
@@ -124,43 +128,62 @@ composer.addPass(finalPass);
 
 // ---------- data + derived parameters
 let D = null;
-const P = { kp: 2, kp24: 2, ap: 7, f107: 100, sn: 40, swSpeed: 400, swDens: 4, bz: 0 };
+const P = { kp: 2, kp24: 2, ap: 7, f107: 100, sn: 40, swSpeed: 400, swDens: 4, bz: 0, lag: 55 };
 const Ptarget = { ...P };
 const replay = { on: false, t: 0, start: 0, end: 0, speed: 0 };
 const clock = new THREE.Clock();
-const fmtTime = (ms) => new Date(ms).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', timeZoneName: 'short' });
-const fmtDay = (ms) => new Date(ms).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' });
+// every time on screen: local (zone) · UTC · GMST (and LST if the viewer set a longitude); compact on phones
+setCompact(mobile);
+const fmtTime = (ms) => fmt3(ms);
+const fmtDay = (ms) => fmt3(ms);
 
 function computeTargets() {
   if (!D) return;
   const following = orchFollowing();
-  const now = following ? orch.timeOf(playK) : replay.on ? replay.t : Math.max(endTime(D.kp), endTime(D.sw, 'speed'));
+  const now = clockT();
   const pick = (v, fallback) => (v === null || v === undefined ? fallback : v);
   Ptarget.kp = pick(at(D.kp, now, 'v', 16), Ptarget.kp);
   Ptarget.kp24 = pick(maxOver(D.kp, now, 24 * 3600e3), Ptarget.kp);
   Ptarget.ap = pick(at(D.ap, now, 'v', 4), Ptarget.ap);
   Ptarget.f107 = pick(at(D.f107, now, 'v', 5), Ptarget.f107);
   Ptarget.sn = pick(sunspot(D, now).v, Ptarget.sn);
-  // the solar wind record is only the last 24 h, so replay keeps its latest values
-  // while the orchestra plays, the wind follows its own 24-hour loop (one 10-minute reading per step)
-  const swT = following ? D.sw.t0 + orch.mapIdx('speed', playK) * D.sw.step
-    : replay.on ? Math.min(now, endTime(D.sw, 'speed')) : endTime(D.sw, 'speed');
-  Ptarget.swSpeed = pick(at(D.sw, swT, 'speed', 12), Ptarget.swSpeed);
-  Ptarget.swDens = pick(at(D.sw, swT, 'dens', 12), Ptarget.swDens);
-  Ptarget.bz = pick(at(D.sw, swT, 'bz', 12), Ptarget.bz);
+  // solar wind on its Earth-arrival timeline (shifted from L1 by the measured speed); the record
+  // only covers about 24 h, so outside it the last values are held and the readout says so
+  const swT = Math.min(now, endTime(D.swE, 'speed'));
+  void following;
+  Ptarget.swSpeed = pick(at(D.swE, swT, 'speed', 12), Ptarget.swSpeed);
+  Ptarget.swDens = pick(at(D.swE, swT, 'dens', 12), Ptarget.swDens);
+  Ptarget.bz = pick(at(D.swE, swT, 'bz', 12), Ptarget.bz);
+  Ptarget.lag = pick(at(D.swE, swT, 'lag', 12), Ptarget.lag);
 }
+// the one clock every scene reads: the orchestra playhead (continuous, UTC at Earth), the replay sweep, or "now"
+let playT = 0, stepWall = 0, stepDur = 0.4;
+function latestT() { return Math.max(endTime(D.kp), endTime(D.swE, 'speed')); }
+function clockT() {
+  if (orchFollowing()) return playT || orch.timeOf(playK);
+  if (replay.on) return replay.t;
+  return D.demo ? orch.timeOf(orch.N - 1) : Math.min(Date.now(), latestT() + 3 * 3600e3);
+}
+ctx.clock = () => ({ follow: orchFollowing() || replay.on, t: clockT() });
+function prepare(d) { d.swE = shiftWind(d.sw); d.sr = srSeries(d); return d; }
 
 function setBadge() {
   const b = $('badge'), live = anyLive(D);
+  $('demo-banner').hidden = !D.demo;
+  if (D.demo) {
+    b.className = 'badge demo'; $('badge-mode').textContent = 'DEMO'; $('badge-asof').textContent = 'illustrative storm, not real data';
+    b.title = 'Typical storm demo: a textbook sequence made up for illustration. Turn it off in the Orchestra panel to return to real data.';
+    return;
+  }
   b.className = 'badge ' + (live ? 'live' : 'snapshot');
   $('badge-mode').textContent = live ? 'LIVE' : 'SNAPSHOT';
   const latestT = Math.max(endTime(D.kp), endTime(D.sw, 'speed'));
-  $('badge-asof').textContent = live ? `data as of ${fmtTime(latestT)}` : `data as of ${D.snapshotAsOf}`;
-  const parts = Object.entries({ 'Kp': D.live.kp, 'Solar wind': D.live.sw, 'F10.7': D.live.f107, 'Sunspots': D.live.ssn })
+  $('badge-asof').textContent = `data as of ${fmtTime(live ? latestT : (D.generated || latestT))}`;
+  const parts = Object.entries({ 'Kp': D.live.kp, 'Solar wind': D.live.sw, 'F10.7': D.live.f107, 'Sunspots': D.live.ssn, 'GOES X-rays': D.live.xr, 'GOES protons': D.live.p10 })
     .map(([k, v]) => `${k}: ${v ? 'live NOAA SWPC' : 'snapshot'}`);
   b.title = parts.join(' · ') + (D.errors.length ? `\nLive fetch issues: ${D.errors.join('; ')}` : '');
-  $('about-status').innerHTML = `<p><b>Right now:</b> ${parts.join(' · ')}.<br>Bundled snapshot generated ${D.snapshotAsOf}.` +
-    (D.errors.length ? `<br>Live fetch issues: ${D.errors.map((e) => e.replace(/</g, '&lt;')).join('; ')}` : '') + '</p>';
+  $('about-status').innerHTML = `<p><b>Right now:</b> ${parts.join(' · ')}.<br>Bundled snapshot generated ${D.generated ? fmtTime(D.generated) : D.snapshotAsOf}.` +
+    (D.errors.length ? `<br>Live fetch issues: ${D.errors.map((e) => e.replace(/</g, '&lt;')).join('; ')}` : '') + '<br>Schumann resonance: <b>modeled</b> (no open live numeric source).</p>';
 }
 
 function readout() {
@@ -171,17 +194,34 @@ function readout() {
   const { r0 } = shue(Dp, P.bz);
   const rows = [];
   const add = (k, v, cls = '') => rows.push(`<span class="k">${k}</span><span class="v ${cls}">${v}</span>`);
+  if (s.id === 'schumann') return readoutSR(f, rows, add);
   add('Kp (geomagnetic)', f(Ptarget.kp, 1), Ptarget.kp >= 5 ? 'hi' : '');
   if (s.id === 'sun') { add('F10.7 radio flux', f(Ptarget.f107, 0) + ' sfu'); add(sunspot(D, orchFollowing() ? orch.timeOf(playK) : replay.on ? replay.t : Date.now()).label, f(Ptarget.sn, 0)); add('Ap (daily)', f(Ptarget.ap, 0)); }
   if (s.id === 'wind' || s.id === 'magneto') {
     add('Wind speed', f(Ptarget.swSpeed, 0) + ' km/s'); add('Density', f(Ptarget.swDens, 1) + ' /cm³');
     add('IMF Bz', (Ptarget.bz > 0 ? '+' : '') + f(Ptarget.bz, 1) + ' nT ' + (Ptarget.bz < -0.5 ? '(south)' : Ptarget.bz > 0.5 ? '(north)' : ''), Ptarget.bz < -5 ? 'hi' : '');
+    add('L1 → Earth delay', '+' + f(Ptarget.lag, 0) + ' min', 'model');
   }
   if (s.id === 'magneto') { add('Dynamic pressure', f(Dp, 2) + ' nPa', 'model'); add('Magnetopause nose', f(r0, 1) + ' Earth radii', 'model'); }
   if (s.id === 'oval' || s.id === 'curtain') { add('Kp max, last 24 h', f(Ptarget.kp24, 1)); add('Oval edge (approx.)', '~' + f(ovalEdge(P.kp), 0) + '° mag. lat', 'model'); }
   rows.push('<div class="sep"></div>');
   const kpT = endTime(D.kp), swT = endTime(D.sw, 'speed');
-  rows.push(`<span class="src">${orchFollowing() ? 'Orchestra playhead at ' + fmtTime(orch.timeOf(playK)) + ' (solar wind loops its latest 24 h)' : replay.on ? 'Replaying ' + fmtDay(replay.t) + ' (solar wind shows latest 24 h only)' : `Kp ${D.live.kp ? 'live' : 'snapshot'} to ${fmtTime(kpT)} · wind ${D.live.sw ? 'live' : 'snapshot'} to ${fmtTime(swT)}${D.sw.source ? ' (' + D.sw.source + ')' : ''}`}. Purple values are model estimates.</span>`);
+  const swNote = clockT() > endTime(D.swE, 'speed') + 3600e3 || clockT() < D.swE.t0 ? ' · no solar wind data at this time (record covers ~24 h), last values held' : ' · solar wind shifted to Earth arrival';
+  rows.push(`<span class="src">${D.demo ? '<b style="color:#ffb45a">DEMO, not real data.</b> ' : ''}${orchFollowing() ? 'Playhead at ' + fmtTime(clockT()) + swNote : replay.on ? 'Replaying ' + fmtDay(replay.t) + swNote : `Kp ${D.live.kp ? 'live' : 'snapshot'} to ${fmtTime(kpT)} · wind ${D.live.sw ? 'live' : 'snapshot'} to ${fmtTime(swT)}${D.sw.source ? ' (' + D.sw.source + ')' : ''}`}. Purple values are model estimates.</span>`);
+  $('readout').innerHTML = rows.join('');
+}
+
+function readoutSR(f, rows, add) {
+  const sc = scenes[byId.schumann], st = sc.state, s = st.s || srAt(D, clockT(), P.kp);
+  const hh = (ms) => fmtTime(ms);
+  add(st.lapse ? 'Scene clock (time-lapse)' : 'Scene clock', hh(st.simT));
+  add('Mode 1 frequency', f(s.f[0], 2) + ' Hz', 'model');
+  add('Cavity intensity', f(s.I * 100, 0) + '% of daily max', 'model');
+  add('Busiest storm region', s.leadLabel, 'model');
+  add('GOES X-rays', s.xcls + (s.dfX > 0.005 ? ` (+${s.dfX.toFixed(2)} Hz)` : ''), s.dfX > 0.05 ? 'hi' : '');
+  add('Protons ≥10 MeV', s.p10 === null ? '—' : f(s.p10, s.p10 < 10 ? 2 : 0) + ' pfu' + (s.dfP < 0 ? ` (${s.dfP.toFixed(2)} Hz)` : ''), s.p10 >= 10 ? 'hi' : '');
+  rows.push('<div class="sep"></div>');
+  rows.push(`<span class="src">${D.demo ? '<b style="color:#ffb45a">DEMO, not real data.</b> ' : ''}Schumann values are <b>modeled</b> (purple): lightning by time of day from the land map, plus published flare (+0.2 Hz) and proton-event (−0.15 to −0.4 Hz) shifts driven by NOAA GOES ${D.live.xr ? 'live' : 'snapshot'} data.</span>`);
   $('readout').innerHTML = rows.join('');
 }
 
@@ -198,6 +238,7 @@ function caption(s) {
 }
 function setActive(i) {
   scenes.forEach((s, k) => (s.controls.enabled = k === i));
+  document.body.classList.toggle('sr-on', scenes[i].id === 'schumann');
   document.querySelectorAll('#picker button').forEach((b, k) => b.classList.toggle('active', k === i));
 }
 function go(i, instant = false) {
@@ -254,7 +295,7 @@ let playK = 0;
 const opt = { follow: params.get('follow') !== '0', tourSolo: true, strip: params.get('strip') !== '0' };
 function orchFollowing() { return !!(orch.playing && opt.follow && orch.S); }
 // which scenes belong to which data set's physical domain (used by "Tour follows solo")
-const HOME = { kp: ['oval', 'curtain'], ap: ['curtain', 'oval'], f107: ['sun'], sn: ['sun'], speed: ['wind', 'magneto'], dens: ['wind', 'magneto'], bz: ['magneto', 'wind'] };
+const HOME = { kp: ['oval', 'curtain'], ap: ['curtain', 'oval'], f107: ['sun'], sn: ['sun'], speed: ['wind', 'magneto'], dens: ['wind', 'magneto'], bz: ['magneto', 'wind'], xr: ['sun', 'schumann'], sr: ['schumann'] };
 const btn = (id, on, label) => { const b = $(id); b.classList.toggle('on', on); b.textContent = `${label}: ${on ? 'on' : 'off'}`; };
 function toggleTour() { tourOn = !tourOn; dwellT = 0; btn('btn-tour', tourOn, 'Tour'); }
 function toggleReplay() {
@@ -284,11 +325,14 @@ const panel = buildPanel($('orch'), orch, {
   play: startOrchestra, close: () => toggleOrch(false), stripSet: () => strip.id,
   setStrip: (id) => strip.setSet(id), get: (k) => opt[k],
   set: (k, v) => { opt[k] = v; if (k === 'strip') setStrip(v); if (k === 'follow') syncSound(); },
+  setDemo: (on) => setDemo(on), demo: () => !!(D && D.demo),
+  jumpTo: (id) => { const ds = orch.S[id]; if (ds && orch.timeOf(orch.pos) < ds.start) orch.seek(orch.kAtTime(ds.start)); },
   changed: () => { strip.dirty = true; },
 });
 orch.on('state', () => syncSound());
 orch.on('step', (e) => {
-  playK = e.k;
+  playK = e.k; stepWall = clock.elapsedTime; stepDur = e.stepS || orch.stepSec;
+  if (e.seek) { playT = orch.timeOf(e.k); resetChains(playT); }
   const so = orch.soloed(); if (so && strip.id !== so) { strip.setSet(so); panel.render(); } // the strip follows a soloed set
   if (e.seek) strip.reset(); else strip.step(e.k, e.fired);
 });
@@ -319,7 +363,7 @@ addEventListener('keydown', (e) => {
   else if (k === 't') toggleTour(); else if (k === 'r') toggleReplay(); else if (k === 's') toggleSound();
   else if (k === 'o') toggleOrch(); else if (k === 'b') { setStrip(!opt.strip); panel.render(); }
   else if (k === 'h') toggleText(); else if (k === 'i') toggleAbout(); else if (k === 'escape') toggleAbout(false);
-  else if (/^[1-5]$/.test(k)) go(+k - 1);
+  else if (/^[1-6]$/.test(k)) go(+k - 1);
 });
 let lastMove = 0;
 const wake = () => { lastMove = clock.elapsedTime; $('ui').classList.remove('idle'); };
@@ -341,7 +385,7 @@ function frame() {
   if (!document.hidden) {
     if (orchFollowing()) {
       $('replay-fill').style.width = (playK / Math.max(1, orch.N - 1) * 100).toFixed(2) + '%';
-      $('replay-date').textContent = '♪ ' + fmtTime(orch.timeOf(playK)) + ' · Kp ' + (Ptarget.kp ?? 0).toFixed(1);
+      $('replay-date').textContent = (D.demo ? 'DEMO · ' : '♪ ') + fmtTime(playT || orch.timeOf(playK)) + ' · Kp ' + (Ptarget.kp ?? 0).toFixed(1) + (orch.tl.eventMode ? ' · event mode' : '');
       const pos = document.getElementById('o-pos'); if (pos) pos.textContent = fmtDay(orch.timeOf(playK)) + ' · step ' + (playK + 1) + ' of ' + orch.N;
     } else if (replay.on && D) {
       replay.t += replay.speed * dt;
@@ -349,12 +393,17 @@ function frame() {
       $('replay-fill').style.width = ((replay.t - replay.start) / (replay.end - replay.start) * 100).toFixed(2) + '%';
       $('replay-date').textContent = fmtDay(replay.t) + ' · Kp ' + (Ptarget.kp ?? 0).toFixed(1);
     }
+    if (orchFollowing()) { // continuous playhead between slots
+      const k0 = Math.min(playK, orch.N - 1), k1 = Math.min(k0 + 1, orch.N - 1), u = Math.min(1, (t - stepWall) / Math.max(0.05, stepDur));
+      playT = orch.timeOf(k0) + u * (orch.timeOf(k1) - orch.timeOf(k0));
+    }
     computeTargets();
+    runChains(t);
     const k = Math.min(1, dt * (replay.on ? 1.5 : 0.6));
     for (const key in P) P[key] += (Ptarget[key] - P[key]) * k;
 
     // tour
-    if (tourOn && next < 0 && $('about').hidden) {
+    if (tourOn && next < 0 && $('about').hidden && !(chainHold > t)) {
       dwellT += dt;
       const so = opt.tourSolo && orch.playing ? orch.soloed() : null;
       if (so) {
@@ -388,13 +437,81 @@ function frame() {
   requestAnimationFrame(frame);
 }
 
+// ---------- chain of events: when the clock passes a stage, show it (cause first, effects after their delays)
+let realD = null, chainT = 0, chainHold = 0, lastGo = -99, hudUntil = 0, curChain = null;
+const chainLog = [];
+const goQueue = [];
+const TYPE_NAME = { flare: 'Solar flare', sep: 'Solar proton event', cme: 'Coronal mass ejection', bzs: 'Southward magnetic field (Bz)', kp5: 'Geomagnetic storm' };
+const fmtD = (ms) => { const m = Math.abs(ms) / 60e3; return (ms < 0 ? '−' : '+') + (m < 90 ? m.toFixed(m < 10 ? 1 : 0) + ' min' : m < 2880 ? (m / 60).toFixed(1) + ' h' : (m / 1440).toFixed(1) + ' d'); };
+function drawHUD() {
+  const el = $('chain'); if (!curChain) { el.hidden = true; return; }
+  const c = curChain, t0 = c.stages[0].t;
+  el.hidden = false;
+  el.innerHTML = `<div class="ch-head"><b>Chain of events</b> · ${TYPE_NAME[c.e.type]}${D.demo ? ' <em>(demo)</em>' : ''}</div>` + c.stages.map((st) =>
+    `<div class="ch-st ${st.done ? 'done' : ''} ${st === c.last ? 'now' : ''}"><span class="ch-t">${fmtD(st.t - t0)}</span><span class="ch-sc">${scenes[byId[st.scene]].label}</span><span class="ch-l">${st.label}</span></div>`).join('') +
+    `<div class="ch-foot">${fmtTime(t0)} · times are when each effect happens where that scene is (Sun scene = emission time)</div>`;
+}
+function resetChains(T) { chainT = T; goQueue.length = 0; if (orch.chains) for (const c of orch.chains) c.stages.forEach((x) => { x.done = x.t <= T; }); }
+function fireStage(c, st, t) {
+  st.done = true; c.last = st; curChain = c; hudUntil = t + 30; drawHUD();
+  chainLog.push({ type: c.e.type, fx: st.fx, scene: st.scene, t: st.t, wall: t });
+  if (chainLog.length > 200) chainLog.shift();
+  const sc = scenes[byId[st.scene]];
+  const visible = scenes[cur] === sc || (next >= 0 && scenes[next] === sc);
+  if (tourOn && !visible) goQueue.push({ c, st }); else reactions.stage(st, sc);
+}
+function runChains(t) {
+  if (!D || !orch.chains) return;
+  const following = orchFollowing() || replay.on;
+  if (following) {
+    const T = clockT();
+    if (T < chainT || T - chainT > 30 * 864e5) resetChains(T);
+    const due = [];
+    for (const c of orch.chains) for (const st of c.stages) if (!st.done && st.t > chainT && st.t <= T) due.push([c, st]);
+    due.sort((a, b) => a[1].t - b[1].t).slice(0, 6).forEach(([c, st]) => fireStage(c, st, t));
+    chainT = T;
+  }
+  // tour follows the chain: visit each stage's scene in order, then show the stage there
+  if (goQueue.length && t - lastGo > 3.4) {
+    const { st } = goQueue.shift(), i = byId[st.scene];
+    if (scenes[cur].id !== st.scene) go(i);
+    lastGo = t; chainHold = t + 10;
+    setTimeout(() => reactions.stage(st, scenes[i]), FADE * 600);
+  }
+  if (curChain && t > hudUntil) { curChain = null; drawHUD(); }
+}
+// event markers on the playhead bar (positions follow musical time, so event mode stretches them)
+function drawMarkers() {
+  const bar = $('replay-bar'); bar.querySelectorAll('.mk').forEach((m) => m.remove());
+  if (!orch.chains || !orch.N) return;
+  const span = replay.on ? [replay.start, replay.end] : null;
+  for (const c of orch.chains) {
+    const x = span ? (c.e.t - span[0]) / (span[1] - span[0]) : orch.kAtTime(c.e.t) / Math.max(1, orch.N - 1);
+    if (x < 0 || x > 1) continue;
+    const m = document.createElement('span'); m.className = 'mk mk-' + c.e.type; m.style.left = (x * 100).toFixed(2) + '%';
+    m.title = `${TYPE_NAME[c.e.type]} · ${fmtTime(c.e.t)}` + (c.e.type === 'flare' ? ' · ' + xcls(c.e.peak) : c.e.type === 'kp5' ? ' · Kp ' + c.e.peak.toFixed(1) : c.e.type === 'bzs' ? ' · ' + c.e.peak.toFixed(0) + ' nT' : '');
+    bar.appendChild(m);
+  }
+}
+orch.on('retime', () => { drawMarkers(); strip.dirty = true; });
+function setDemo(on) {
+  if (!realD) return;
+  D = on ? prepare(demoData(realD)) : realD; ctx.D = D;
+  const was = orch.playing; orch.setData(D); orch.pos = 0; playK = on ? 0 : orch.N - 1; playT = orch.timeOf(playK); resetChains(playT);
+  strip.reset(); setBadge(); computeTargets(); readout(); panel.render(); drawMarkers();
+  if (on && !was && params.get('autoplay') !== '0') startOrchestra();
+}
+
 // ---------- boot
 (async () => {
   const start = byId[params.get('scene')] ?? 0;
   go(start, true);
   tourOn = params.get('tour') !== '0'; btn('btn-tour', tourOn, 'Tour');
   try {
-    D = await loadSnapshot();
+    realD = prepare(await loadSnapshot()); D = realD; ctx.D = D;
+    if (params.get('event') === '1') orch.tl.eventMode = true;
+    if (params.get('window')) orch.tl.window = params.get('window');
+    if (params.get('bars')) orch.tl.barsPerDay = +params.get('bars') || 4;
     orch.setData(D); playK = orch.N - 1; orch.pos = 0;
     setBadge(); computeTargets(); Object.assign(P, Ptarget); readout();
   } catch (e) {
@@ -403,11 +520,22 @@ function frame() {
   }
   requestAnimationFrame(frame);
   if (D && params.get('live') !== '0') {
-    await refreshLive(D);
-    orch.setData(D); if (!orch.playing) playK = orch.N - 1; strip.reset();
+    await refreshLive(realD); prepare(realD);
+    if (!D.demo) { orch.setData(D); if (!orch.playing) playK = orch.N - 1; strip.reset(); }
     setBadge(); readout();
   }
+  if (params.get('demo') === '1') setDemo(true);
   setStrip(opt.strip); panel.render();
+  // Bartels strip tooltip: the reading under the pointer, with its three times
+  $('strip').addEventListener('mousemove', (e) => {
+    const r = e.currentTarget.getBoundingClientRect(), hit = strip.at(e.clientX - r.left, e.clientY - r.top);
+    e.currentTarget.title = hit ? `${hit.label}: ${hit.v} · ${fmtTime(hit.t)}` : 'Bartels light-up strip';
+  });
+  // optional longitude for Local Sidereal Time (typed by the viewer; location is never requested)
+  const lonIn = $('lon-in'); if (lonIn) {
+    const v = getLon(); lonIn.value = v === null ? '' : v;
+    lonIn.addEventListener('change', () => { const x = lonIn.value.trim(); setLon(x === '' ? null : x); setBadge(); readout(); drawMarkers(); drawHUD(); $('lon-note').textContent = getLon() === null ? 'Showing GMST only.' : `Showing LST for ${getLon()}°.`; });
+  }
   if (params.get('orch') === '1') toggleOrch(true);
-  window.__spacewx = { D, P, scenes, go, orch, reactions, strip, opt, get cur() { return cur; }, get playK() { return playK; } };
+  window.__spacewx = { get D() { return D; }, P, scenes, go, orch, reactions, strip, opt, chainLog, setDemo, clockT, get cur() { return cur; }, get playK() { return playK; } };
 })();

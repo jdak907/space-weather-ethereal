@@ -8,6 +8,8 @@ const sel = (key, opts0, val, title) => {
   return `<label class="f"><span>${title}</span><select data-k="${key}">${opts.map(([v, l]) => `<option value="${v}"${String(v) === String(val) ? ' selected' : ''}>${l}</option>`).join('')}</select></label>`;
 };
 
+const fmtDur = (ms) => { const m = ms / 60e3; return m < 90 ? Math.round(m) + ' min' : (m / 60).toFixed(1) + ' h'; };
+const tsel = (key, opts, val, title) => `<label class="f"><span>${title}</span><select data-tl="${key}">${opts.map(([v, l]) => `<option value="${v}"${String(v) === String(val) ? ' selected' : ''}>${l}</option>`).join('')}</select></label>`;
 export function buildPanel(root, orch, opts) {
   const o = orch;
   function render() {
@@ -31,6 +33,18 @@ export function buildPanel(root, orch, opts) {
         ${sel('fb', FBS.map((n) => [n, pct(n)]), o.fx.fb, 'Delay repeats')}
         ${sel('dmix', DMIX.map((n) => [n, pct(n)]), o.fx.dmix, 'Delay mix')}
         ${sel('strip', ORDER.map((id) => [id, SET_INFO[id].short]), opts.stripSet(), 'Strip shows')}
+      </div>
+      <div class="o-tl">
+        <div class="o-tl-h">Timeline <small>one UTC clock for every data set · solar wind shifted from L1 to Earth arrival</small></div>
+        <div class="o-grid">
+          ${tsel('window', [['1d', 'Last 24 hours'], ['3d', 'Last 3 days'], ['7d', 'Last 7 days'], ['27d', 'Last 27 days'], ['all', 'Everything (~135 days)']], o.tl.window, 'Window')}
+          ${tsel('barsPerDay', [[1, '1 day = 1 bar'], [2, '1 day = 2 bars'], [4, '1 day = 4 bars'], [8, '1 day = 8 bars'], [16, '1 day = 16 bars'], [32, '1 day = 32 bars']], o.tl.barsPerDay, 'Compression')}
+        </div>
+        <div class="o-row o-toggles">
+          <label title="Speed through quiet stretches (3x) and slow down near flares, proton events, southward Bz and storms (8x slower)"><input type="checkbox" data-tlc="eventMode" ${o.tl.eventMode ? 'checked' : ''}> Event mode</label>
+          <label title="An illustrative textbook storm sequence. Not real data."><input type="checkbox" data-tlc="demo" ${opts.demo() ? 'checked' : ''}> Typical storm demo <em>(not real data)</em></label>
+        </div>
+        <div class="o-tl-s">${o.N} steps · one step ≈ ${fmtDur(o.slotMs)} of real time${o.tl.eventMode ? ' (stretched near events)' : ''} · ${o.chains ? o.chains.length : 0} events on the timeline</div>
       </div>
       <div class="o-row o-toggles">
         <label><input type="checkbox" data-t="loop" ${o.loop ? 'checked' : ''}> Loop</label>
@@ -61,7 +75,7 @@ export function buildPanel(root, orch, opts) {
           </div>`;
         }).join('')}
       </div>
-      <p class="o-note">One step = one 3-hour Kp reading. Daily sets hold for 8 steps; the 24-hour solar wind sets loop. Pitch: each reading snapped to the scale over 3 octaves from A2. Color: hue = pitch class × 30° (C = red), darker = lower octave.</p>`;
+      <p class="o-note">Every set is read at the playhead's UTC time and held only over its own cadence (Kp 3-hourly, Ap/F10.7/sunspots daily, wind 10-min means, X-rays 10-min maxima); silent where a set has no reading. Pitch: each reading snapped to the scale over 3 octaves from A2. Schumann (modeled): its five mode frequencies × 16 (4 octaves up: 125, 229, 333, 437, 541 Hz) as one drone; more lightning = more modes ring. Color: hue = pitch class × 30° (C = red), darker = lower octave.</p>`;
   }
   root.addEventListener('click', async (e) => {
     const b = e.target.closest('button'); if (!b) return;
@@ -72,12 +86,15 @@ export function buildPanel(root, orch, opts) {
     else if (b.dataset.ch) {
       const id = b.closest('.o-ch').dataset.id, k = b.dataset.ch; o.ch[id][k] = !o.ch[id][k];
       if (k === 'solo' && o.ch[id].solo) o.ch[id].on = true;
+      if ((k === 'solo' || k === 'on') && o.ch[id].on && opts.jumpTo) opts.jumpTo(id); // short records (solar wind ~24 h): jump to where the set has data
       o.preset = ''; o.refresh(); opts.changed();
     }
     render();
   });
   root.addEventListener('change', (e) => {
     const t = e.target;
+    if (t.dataset.tl) { orch.tl[t.dataset.tl] = t.dataset.tl === 'barsPerDay' ? +t.value : t.value; orch.retime(); opts.changed(); render(); return; }
+    if (t.dataset.tlc) { if (t.dataset.tlc === 'demo') opts.setDemo(t.checked); else { orch.tl.eventMode = t.checked; orch.retime(); opts.changed(); } render(); return; }
     if (t.dataset.t) { const k = t.dataset.t; if (k === 'loop' || k === 'marker') o[k] = t.checked; else opts.set(k, t.checked); return; }
     const k = t.dataset.k; if (!k) return;
     const chEl = t.closest('.o-ch');

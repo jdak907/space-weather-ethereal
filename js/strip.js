@@ -26,6 +26,15 @@ export class BartelsStrip {
     if (f) this.flash = 1;
     this.dirty = true;
   }
+  // which reading is under (x, y) in CSS pixels -> { t, v, label }
+  at(x, y) {
+    if (!this.o.S || !this.lay) return null;
+    const { L, TOP, RH, plotW, rows, ds, epoch, cyc, k0 } = this.lay;
+    const r = Math.floor((y - TOP) / RH); if (r < 0 || r >= rows || x < L) return null;
+    const t = epoch + (k0 + r) * cyc + ((x - L) / plotW) * cyc;
+    const i = Math.floor((t - ds.start) / (ds.stepH * 3600e3)); if (i < 0 || i >= ds.v.length || !(ds.v[i] > MISSING)) return null;
+    return { t: ds.start + i * ds.stepH * 3600e3, v: (Math.round(ds.v[i] * 100) / 100) + (ds.unit ? ' ' + ds.unit : ''), label: ds.short };
+  }
   draw(dt) {
     if (!this.o.S || this.cv.offsetParent === null) return;
     if (this.flash > 0) { this.flash = Math.max(0, this.flash - dt * 2.2); this.dirty = true; }
@@ -36,14 +45,15 @@ export class BartelsStrip {
     if (this.cv.width !== Math.round(W * dpr) || this.cv.height !== Math.round(H * dpr)) { this.cv.width = Math.round(W * dpr); this.cv.height = Math.round(H * dpr); this.cv.style.height = H + 'px'; }
     const g = this.cv.getContext('2d'); g.setTransform(dpr, 0, 0, dpr, 0, 0); g.clearRect(0, 0, W, H);
     const plotW = W - L - 6, slot = plotW / perTurn;
+    this.lay = { L, TOP, RH, plotW, rows, ds, epoch, cyc, k0 };
     g.font = '10px system-ui, sans-serif'; g.fillStyle = 'rgba(200,210,230,.65)'; g.textBaseline = 'middle';
     const daily = ds.cycleH > 24;
-    g.fillText(daily ? 'Bartels rotation' : '6-hour rows (PT)', 0, 7);
-    g.textAlign = 'right'; g.fillText(this.o.S[this.id].short + (daily ? ' · day 1 → 27' : ' · 0 → 6 h'), W - 4, 7); g.textAlign = 'left';
+    g.fillText(daily ? 'Bartels rotation' : ds.cycleH + (ds.cycleH >= 24 ? '-hour rows (UTC days)' : '-hour rows (your time)'), 0, 7);
+    g.textAlign = 'right'; g.fillText(this.o.S[this.id].short + (daily ? ' · day 1 → 27' : ' · 0 → ' + ds.cycleH + ' h'), W - 4, 7); g.textAlign = 'left';
     for (let r = 0; r < rows; r++) {
       const y0 = TOP + r * RH, yb = y0 + RH - 3;
       g.fillStyle = 'rgba(255,255,255,.05)'; g.fillRect(L, y0, plotW, RH - 2);
-      const lab = daily ? 'BR ' + (k0 + r + 1) : new Date(epoch + (k0 + r) * cyc).toLocaleTimeString('en-US', { timeZone: 'America/Los_Angeles', hour: 'numeric' });
+      const lab = daily ? 'BR ' + (k0 + r + 1) : ds.cycleH >= 24 ? new Date(epoch + (k0 + r) * cyc).toLocaleDateString(undefined, { timeZone: 'UTC', month: 'short', day: 'numeric' }) : new Date(epoch + (k0 + r) * cyc).toLocaleTimeString(undefined, { hour: 'numeric' });
       g.fillStyle = 'rgba(200,210,230,.6)'; g.fillText(lab, 0, y0 + RH / 2);
     }
     const sw = Math.max(1, Math.min(4, slot * 0.6));

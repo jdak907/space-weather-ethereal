@@ -24,7 +24,11 @@ export async function loadSnapshot(url = 'data.json') {
       speed: sw.speed.slice(), dens: sw.dens.slice(), bz: sw.bz.slice(),
       source: (sw.source || []).join(', '),
     },
-    live: { kp: false, sw: false, f107: false, ssn: false },
+    // NOAA GOES X-ray (0.1-0.8 nm, W/m^2) and >=10 MeV protons (pfu), 10-min maxima: drive the Schumann model's space weather term
+    xr: d.goes ? series(d.goes.xr) : { t0: Date.parse(d.kp.start), step: 6e5, v: [] },
+    p10: d.goes ? series(d.goes.p10) : { t0: Date.parse(d.kp.start), step: 6e5, v: [] },
+    goesAsOf: d.goes ? d.goes.generatedUtc : null,
+    live: { kp: false, sw: false, f107: false, ssn: false, xr: false, p10: false },
     liveSSN: null, // SWPC sunspot number (different scale from SILSO SN), only if fetched
     errors: [],
   };
@@ -66,6 +70,14 @@ async function getJSON(url, ms = 9000) {
 }
 const utc = (s) => Date.parse(/Z$|[+-]\d\d:?\d\d$/.test(s) ? s : s.replace(' ', 'T') + 'Z');
 
+// keep the larger value in a bin (several 1-min GOES readings fall in one 10-min bin)
+function maxIntoSeries(s, t, v) {
+  if (!s.v.length) s.t0 = Math.floor(t / s.step) * s.step;
+  const i = Math.floor((t - s.t0) / s.step);
+  if (i < 0) return;
+  while (s.v.length <= i) s.v.push(MISSING);
+  if (!(s.v[i] > MISSING) || v > s.v[i]) s.v[i] = v;
+}
 function putIntoSeries(s, t, v) {
   const i = Math.round((t - s.t0) / s.step);
   if (i < 0) return;
@@ -141,6 +153,18 @@ export async function refreshLive(D) {
       const r = rows.filter((x) => isFinite(x.swpc_ssn) && x.swpc_ssn >= 0).pop();
       if (!r) throw new Error('no SSN');
       D.liveSSN = { v: r.swpc_ssn, t: utc(r.Obsdate) };
+    },
+    xr: async () => {
+      const rows = await getJSON(`${SWPC}/json/goes/primary/xrays-1-day.json`);
+      let n = 0;
+      for (const r of rows) { if (r.energy !== '0.1-0.8nm' || !(r.flux > 0)) continue; maxIntoSeries(D.xr, utc(r.time_tag), r.flux); n++; }
+      if (!n) throw new Error('no X-ray rows');
+    },
+    p10: async () => {
+      const rows = await getJSON(`${SWPC}/json/goes/primary/integral-protons-1-day.json`);
+      let n = 0;
+      for (const r of rows) { if (r.energy !== '>=10 MeV' || !(r.flux >= 0)) continue; maxIntoSeries(D.p10, utc(r.time_tag), r.flux); n++; }
+      if (!n) throw new Error('no proton rows');
     },
   };
   await Promise.all(Object.entries(jobs).map(async ([k, f]) => {

@@ -7,7 +7,7 @@ Needs Playwright (pip install playwright) and a local server:
 import argparse, json, os, sys, time
 from playwright.sync_api import sync_playwright
 
-SCENES = ["sun", "wind", "magneto", "oval", "curtain"]
+SCENES = ["sun", "wind", "magneto", "oval", "curtain", "schumann"]
 ap = argparse.ArgumentParser()
 ap.add_argument("--base", default="http://localhost:8931/")
 ap.add_argument("--wait", type=float, default=9)

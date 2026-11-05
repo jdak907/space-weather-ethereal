@@ -7,15 +7,18 @@ const HOUR_MS = 3600e3;
 export const ROT = 216; // steps in a 27-day Bartels rotation (27 days x 8 three-hour readings)
 export const BARTELS_EPOCH = Date.UTC(1832, 1, 8);
 
-export const ORDER = ['kp', 'ap', 'f107', 'sn', 'speed', 'dens', 'bz'];
+import { findEvents, chainFor, buildSlots, resample } from './timeline.js';
+export const ORDER = ['kp', 'ap', 'f107', 'sn', 'speed', 'dens', 'bz', 'xr', 'sr'];
 export const SET_INFO = {
   kp: { label: 'Kp index (3-hourly)', short: 'Kp', unit: '', lo: 0, hi: 9, diverge: false, cycleH: 27 * 24, turnName: '27-day solar rotation', domain: 'Geomagnetic activity' },
   ap: { label: 'Ap index (daily)', short: 'Ap', unit: 'nT', lo: 0, hi: 80, diverge: false, cycleH: 27 * 24, turnName: '27-day solar rotation', domain: 'Geomagnetic activity' },
   f107: { label: 'Solar radio flux F10.7 (daily)', short: 'F10.7', unit: 'sfu', lo: 85, hi: 250, diverge: false, cycleH: 27 * 24, turnName: '27-day solar rotation', domain: 'The Sun' },
   sn: { label: 'Sunspot number (daily)', short: 'Sunspots', unit: '', lo: 0, hi: 140, diverge: false, cycleH: 27 * 24, turnName: '27-day solar rotation', domain: 'The Sun' },
-  speed: { label: 'Solar wind speed (last 24 h)', short: 'Wind speed', unit: 'km/s', lo: 320, hi: 440, diverge: false, cycleH: 6, turnName: '6 hours', domain: 'Solar wind' },
+  speed: { label: 'Solar wind speed (last 24 h, shifted L1 -> Earth)', short: 'Wind speed', unit: 'km/s', lo: 320, hi: 440, diverge: false, cycleH: 6, turnName: '6 hours', domain: 'Solar wind' },
   dens: { label: 'Solar wind density (last 24 h)', short: 'Density', unit: 'p/cm³', lo: 1, hi: 4, diverge: false, cycleH: 6, turnName: '6 hours', domain: 'Solar wind' },
   bz: { label: 'Magnetic field Bz (last 24 h)', short: 'Bz', unit: 'nT', lo: -8, hi: 8, diverge: true, cycleH: 6, turnName: '6 hours', domain: 'Magnetosphere' },
+  xr: { label: 'Solar X-rays, GOES 0.1-0.8 nm (10-min max)', short: 'X-rays', unit: 'log W/m²', lo: -7, hi: -3.7, diverge: false, cycleH: 24, turnName: '1 day', domain: 'The Sun (seen at Earth 8.3 min later)' },
+  sr: { label: 'Schumann resonance (modeled intensity, 3-hourly)', short: 'Schumann', unit: '', lo: 0.3, hi: 1, diverge: false, cycleH: 27 * 24, turnName: '27-day solar rotation', domain: 'Earth-ionosphere cavity (modeled)', modeled: true },
 };
 
 export const SCALES = {
@@ -30,7 +33,7 @@ export const SCALES = {
 };
 export const INSTS = [
   ['eno', 'Airport piano'], ['pad', 'Slow pad, filter sweep'], ['shimmer', 'Shimmer glass'], ['choir', 'Soft choir'],
-  ['bell', 'Long bell'], ['glass', 'Simple glass'], ['pluck', 'Pluck'],
+  ['bell', 'Long bell'], ['glass', 'Simple glass'], ['pluck', 'Pluck'], ['cavity', 'Cavity drone (Schumann modes)'],
 ];
 export const LENS = {
   half: { label: 'Half note (2 beats)', beats: 2 }, quarter: { label: 'Quarter note', beats: 1 }, qtrip: { label: 'Quarter triplet', beats: 2 / 3 },
@@ -58,24 +61,38 @@ export const PRESETS = {
   ambient: {
     label: 'Ambient orchestra', bpm: 72, len: 'eighth', meter: '4', scale: 'penta', fx: { revMix: 0.45, revLen: 9, dly: 'q', fb: 0.35, dmix: 0.25 },
     ch: { kp: on('eno', 'every', 0, 0, 0.8, 0), ap: off('bell', 'change'), f107: on('pad', 'drone', -1, 0, 0.45, -0.5), sn: on('choir', 'drone', 0, 7, 0.35, 0.5),
-      speed: on('shimmer', 'n8', 1, 4, 0.3, 0.5), dens: off('glass', 'n4'), bz: off('pluck', 'n2') },
+      speed: on('shimmer', 'n8', 1, 4, 0.3, 0.5), dens: off('glass', 'n4'), bz: off('pluck', 'n2'), xr: on('bell', 'change', 1, 7, 0.35, 0.5), sr: on('cavity', 'n2', 0, 0, 0.45, 0) },
   },
   solo: {
     label: 'Solo Kp', bpm: 80, len: 'eighth', meter: '4', scale: 'penta', fx: { revMix: 0.4, revLen: 9, dly: 'q', fb: 0.3, dmix: 0.25 },
     ch: { kp: on('eno', 'every', 0, 0, 0.9, 0), ap: off('bell', 'change'), f107: off('pad', 'drone'), sn: off('choir', 'drone'),
-      speed: off('shimmer', 'n8'), dens: off('glass', 'n4'), bz: off('pluck', 'n2') },
+      speed: off('shimmer', 'n8'), dens: off('glass', 'n4'), bz: off('pluck', 'n2'), xr: off('bell', 'change'), sr: off('cavity', 'n2') },
   },
   storm: {
     label: 'Storm ensemble', bpm: 112, len: 'eighth', meter: '7', scale: 'minpenta', fx: { revMix: 0.3, revLen: 6, dly: 'de', fb: 0.4, dmix: 0.3 },
     ch: { kp: on('bell', 'every', 0, 0, 0.7, 0), ap: on('pluck', 'change', 0, 7, 0.6, -0.5), f107: off('pad', 'drone'), sn: off('choir', 'drone'),
-      speed: on('pad', 'drone', -1, 0, 0.45, 0), dens: on('glass', 'n4', 1, 3, 0.3, 0.5), bz: on('pluck', 'n2', 1, 0, 0.45, 0.5) },
+      speed: on('pad', 'drone', -1, 0, 0.45, 0), dens: on('glass', 'n4', 1, 3, 0.3, 0.5), bz: on('pluck', 'n2', 1, 0, 0.45, 0.5), xr: on('bell', 'change', 1, 0, 0.5, -0.5), sr: on('cavity', 'n2', 0, 0, 0.35, 0) },
   },
   all: {
     label: 'Everything on', bpm: 66, len: 'quarter', meter: '3', scale: 'lydian', fx: { revMix: 0.55, revLen: 14, dly: 'q', fb: 0.35, dmix: 0.2 },
     ch: { kp: on('eno', 'every', 0, 0, 0.75, 0), ap: on('bell', 'change', 1, 7, 0.35, -0.5), f107: on('pad', 'drone', -1, 0, 0.4, -0.5),
-      sn: on('choir', 'drone', 0, 4, 0.3, 0.5), speed: on('shimmer', 'n4', 1, 0, 0.3, 0.5), dens: on('glass', 'n8', 1, 7, 0.25, -0.5), bz: on('pluck', 'n2', 0, 0, 0.3, 0.5) },
+      sn: on('choir', 'drone', 0, 4, 0.3, 0.5), speed: on('shimmer', 'n4', 1, 0, 0.3, 0.5), dens: on('glass', 'n8', 1, 7, 0.25, -0.5), bz: on('pluck', 'n2', 0, 0, 0.3, 0.5), xr: on('bell', 'change', 1, 0, 0.3, 0),
+      sr: on('cavity', 'n2', 0, 0, 0.4, 0) },
+  },
+  schumann: {
+    label: 'Schumann cavity', bpm: 60, len: 'quarter', meter: '3', scale: 'lydian', fx: { revMix: 0.6, revLen: 14, dly: 'h', fb: 0.35, dmix: 0.2 },
+    ch: { kp: on('glass', 'change', 1, 0, 0.35, -0.5), ap: off('bell', 'change'), f107: off('pad', 'drone'), sn: off('choir', 'drone'),
+      speed: off('shimmer', 'n8'), dens: off('glass', 'n4'), bz: off('pluck', 'n2'), xr: on('bell', 'change', 1, 7, 0.4, 0.5), sr: on('cavity', 'every', 0, 0, 0.75, 0) },
   },
 };
+
+// ---------- Schumann modes as sound: the five modeled mode frequencies x 16 (4 octaves up),
+// so 7.83 / 14.3 / 20.8 / 27.3 / 33.8 Hz become 125.3 / 228.8 / 332.8 / 436.8 / 540.8 Hz.
+// The space weather shift travels with them (a +0.2 Hz flare shift is +3.2 Hz audible).
+export const SR_F = [7.83, 14.3, 20.8, 27.3, 33.8], SR_X = 16;
+const SR_AMP = [1, 0.72, 0.52, 0.36, 0.25];
+export const srModes = (I) => Math.max(1, Math.min(5, 1 + Math.round(((I - 0.3) / 0.7) * 4))); // more lightning -> more overtones ring
+export const srMidi = (n, oct = 0) => Math.round(69 + 12 * Math.log2((SR_F[n - 1] * SR_X * 2 ** oct) / 440));
 
 // ---------- pitch and color
 export const NOTE_NAMES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
@@ -96,8 +113,12 @@ export function buildSets(D) {
   const mk = (id, t0, stepMs, v) => ({ id, ...SET_INFO[id], start: t0, stepH: stepMs / HOUR_MS, v, daily: stepMs >= 24 * HOUR_MS });
   const S = {
     kp: mk('kp', D.kp.t0, D.kp.step, D.kp.v), ap: mk('ap', D.ap.t0, D.ap.step, D.ap.v), f107: mk('f107', D.f107.t0, D.f107.step, D.f107.v),
-    sn: mk('sn', D.sn.t0, D.sn.step, D.sn.v), speed: mk('speed', D.sw.t0, D.sw.step, D.sw.speed), dens: mk('dens', D.sw.t0, D.sw.step, D.sw.dens),
-    bz: mk('bz', D.sw.t0, D.sw.step, D.sw.bz),
+    sn: mk('sn', D.sn.t0, D.sn.step, D.sn.v),
+    // solar wind on Earth-arrival time (shifted from L1 by the measured speed)
+    speed: mk('speed', D.swE.t0, D.swE.step, D.swE.speed), dens: mk('dens', D.swE.t0, D.swE.step, D.swE.dens),
+    bz: mk('bz', D.swE.t0, D.swE.step, D.swE.bz),
+    xr: mk('xr', D.xr.t0, D.xr.step, D.xr.v.map((x) => (x > 0 ? Math.log10(x) : MISSING))),
+    sr: D.sr ? { ...mk('sr', D.sr.t0, D.sr.step, D.sr.v), df: D.sr.df } : mk('sr', D.kp.t0, D.kp.step, D.kp.v.map(() => MISSING)),
   };
   // trim trailing missing Kp so the playhead ends at the newest real reading
   let n = S.kp.v.length; while (n > 1 && !(S.kp.v[n - 1] > MISSING)) n--;
@@ -231,6 +252,46 @@ function playNote(rig, inst, f, t0, hold, vel, out) {
   return true;
 }
 
+// persistent drone: per mode, two slightly detuned sines + a soft octave, through a gentle low-pass
+function droneSet(rig, out, I, df, t, oct = 0, glide = 1) {
+  const ctx = rig.ctx;
+  if (!rig.drone) {
+    if (!out) return;
+    const g = ctx.createGain(); g.gain.value = 0; const lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 1400; lp.Q.value = 0.4;
+    g.connect(lp); const sw = ctx.createGain(); sw.gain.value = 1; lp.connect(sw);
+    const modes = SR_F.map((f0, n) => {
+      const mg = ctx.createGain(); mg.gain.value = 0; const tg = ctx.createGain(); tg.gain.value = 0.8; mg.connect(tg); tg.connect(g);
+      const oscs = [[1, -4, 0.5], [1, 4, 0.5], [2, 0, 0.12]].map(([m, det, a]) => {
+        const o = ctx.createOscillator(); o.type = 'sine'; o.frequency.value = f0 * SR_X * m; o.detune.value = det;
+        const og = ctx.createGain(); og.gain.value = a; o.connect(og); og.connect(mg); o.start(); return { o, m };
+      });
+      // slow tremolo, a different rate per mode, so the chord breathes
+      const lfo = ctx.createOscillator(); lfo.frequency.value = 0.05 + 0.031 * n; const lg = ctx.createGain(); lg.gain.value = 0.2;
+      lfo.connect(lg); lg.connect(tg.gain); lfo.start();
+      return { mg, oscs };
+    });
+    rig.drone = { g, sw, modes, out: null };
+  }
+  const d = rig.drone;
+  if (out && d.out !== out) { try { d.sw.disconnect(); } catch (_e) { /* first time */ } d.sw.connect(out); d.out = out; }
+  const tc = Math.max(0.2, glide / 3);
+  d.g.gain.setTargetAtTime(out ? 0.16 : 0, t, out ? tc : 0.5);
+  if (!out) return;
+  const n = srModes(I), amp = Math.sqrt(Math.max(0, I));
+  d.modes.forEach((m, k) => {
+    const lvl = k < n ? SR_AMP[k] * amp : SR_AMP[k] * amp * 0.12;
+    m.mg.gain.setTargetAtTime(lvl, t, tc * 2);
+    const scale = [1, 1.75, 2.2, 2.6, 3.0][k];
+    m.oscs.forEach(({ o, m: mult }) => o.frequency.setTargetAtTime((SR_F[k] + df * scale) * SR_X * 2 ** oct * mult, t, tc));
+  });
+}
+// a soft swell on the drone when a Schumann "note" fires
+function droneSwell(rig, t, vel) {
+  const d = rig.drone; if (!d) return;
+  d.sw.gain.cancelScheduledValues(t); d.sw.gain.setValueAtTime(1, t);
+  d.sw.gain.linearRampToValueAtTime(1 + 0.6 * vel, t + 0.6); d.sw.gain.setTargetAtTime(1, t + 0.6, 1.2);
+}
+
 const clone = (o) => JSON.parse(JSON.stringify(o));
 
 // ---------- the player
@@ -241,43 +302,58 @@ export class Orchestra {
     this.loop = true; this.marker = true;
     this.lastVal = {}; this.lastNote = {};
     this.events = []; // visual events waiting for their audio time
-    this.listeners = { note: [], step: [], state: [] };
+    this.listeners = { note: [], step: [], state: [], retime: [] };
+    this.tl = { window: '7d', barsPerDay: 4, eventMode: false };
     this.stats = { steps: 0, notesScheduled: 0, notesAudible: 0, voicesStarted: 0 };
     this.applyPreset('ambient');
   }
   on(ev, fn) { this.listeners[ev].push(fn); }
   emit(ev, x) { this.listeners[ev].forEach((f) => f(x)); }
   setData(D) {
-    this.S = buildSets(D); this.N = this.S.kp.v.length;
-    if (this.pos >= this.N) this.pos = 0;
-    this.lastVal = {}; this.lastNote = {};
+    this.D = D; this.S = buildSets(D);
+    this.retime(false);
   }
+  // build the shared UTC timeline: slot times, time-aligned values, events and their chains
+  get slotsPerBar() { return METERS[this.meter].len / LENS[this.len].beats; }
+  retime(keep = true) {
+    if (!this.D) return;
+    const T0 = keep && this.T ? this.T[Math.min(this.pos, this.T.length - 1)] : null;
+    this.ev = findEvents(this.D);
+    const sl = buildSlots(this.D, { ...this.tl, slotsPerBar: this.slotsPerBar }, this.ev);
+    this.T = sl.T; this.slotMs = sl.slotMs; this.N = this.T.length; this.spb = this.slotsPerBar;
+    this.R = resample(this.D, this.T, ORDER);
+    this.chains = this.ev.filter((e) => e.t <= sl.tEnd + 6 * HOUR_MS && (e.tEnd || e.t) >= sl.t0 - 6 * HOUR_MS)
+      .map((e) => ({ e, stages: chainFor(e) }));
+    let k = 0; if (T0 !== null) while (k < this.N - 1 && this.T[k] < T0) k++;
+    this.pos = Math.min(k, this.N - 1); this.lastVal = {}; this.lastNote = {};
+    this.emit('retime', this);
+  }
+  kAtTime(t) { let lo = 0, hi = this.N - 1; while (lo < hi) { const m = (lo + hi) >> 1; if (this.T[m] < t) lo = m + 1; else hi = m; } return lo; }
   applyPreset(key) {
     const p = PRESETS[key]; this.preset = key;
     this.ch = clone(p.ch); this.bpm = p.bpm; this.len = p.len; this.meter = p.meter; this.scale = p.scale; this.fx = clone(p.fx);
     this.lastVal = {}; this.lastNote = {};
     this.refresh();
   }
-  refresh() { const r = this.rig; if (!r) return; applyFx(r, this.fx, this.bpm); ORDER.forEach((id) => chanNode(r, id, this.ch[id])); }
+  refresh() { if (this.D && this.spb !== this.slotsPerBar) this.retime(); const r = this.rig; if (!r) return; applyFx(r, this.fx, this.bpm); ORDER.forEach((id) => chanNode(r, id, this.ch[id])); }
   get steps() { return SCALES[this.scale].steps; }
   get stepSec() { return (60 / this.bpm) * LENS[this.len].beats; }
   anySolo() { return ORDER.some((id) => this.ch[id].on && this.ch[id].solo); }
   audible(id) { const c = this.ch[id]; return c.on && !c.mute && (!this.anySolo() || c.solo); }
   soloed() { const s = ORDER.filter((id) => this.ch[id].on && this.ch[id].solo); return s.length === 1 ? s[0] : null; }
   offset(id) { return 12 * this.ch[id].oct + this.ch[id].trans; }
-  midiFor(id, v) { return toMidi(norm(this.S[id], v), this.steps) + this.offset(id); }
-  // master clock index k -> index into a set
+  midiFor(id, v) {
+    if (id === 'sr' && this.ch.sr.inst === 'cavity') return srMidi(srModes(v), this.ch.sr.oct);
+    return toMidi(norm(this.S[id], v), this.steps) + this.offset(id);
+  }
+  // slot k -> index into a set's own native series at the slot's UTC time (-1 if no reading then)
   mapIdx(id, k) {
-    const ds = this.S[id]; if (id === 'kp') return k;
-    if (ds.daily) { const j = Math.floor((this.S.kp.start + k * 3 * HOUR_MS - ds.start) / (24 * HOUR_MS)); return j >= 0 && j < ds.v.length ? j : -1; }
-    const n = ds.v.length; return (((k - this.startK) % n) + n) % n;
+    const ds = this.S[id], T = this.T[Math.max(0, Math.min(this.N - 1, k))];
+    const j = Math.floor((T - ds.start) / (ds.stepH * HOUR_MS));
+    return j >= 0 && j < ds.v.length ? j : -1;
   }
-  kFor(id, j) {
-    const ds = this.S[id]; if (id === 'kp') return j;
-    if (ds.daily) return Math.max(0, Math.min(this.N - 1, Math.ceil((ds.start + j * 24 * HOUR_MS - this.S.kp.start) / (3 * HOUR_MS))));
-    return Math.min(this.N - 1, this.startK + j);
-  }
-  timeOf(k) { return timeAt(this.S.kp, k); }
+  kFor(id, j) { return this.kAtTime(timeAt(this.S[id], j)); }
+  timeOf(k) { return this.T ? this.T[Math.max(0, Math.min(this.N - 1, k))] : 0; }
   ensureRig() {
     if (!this.rig) this.rig = buildRig();
     if (!this.rig) return null;
@@ -298,7 +374,7 @@ export class Orchestra {
   }
   pause() {
     this.playing = false; clearInterval(this.timer); this.events.length = 0;
-    if (this.rig) this.rig.master.gain.setTargetAtTime(0.0, this.rig.ctx.currentTime, 0.6);
+    if (this.rig) { this.rig.master.gain.setTargetAtTime(0.0, this.rig.ctx.currentTime, 0.6); droneSet(this.rig, null, 0, 0, this.rig.ctx.currentTime); }
     this.emit('state', this);
   }
   stop() { this.pause(); this.pos = this.startK; this.count = 0; this.lastVal = {}; this.lastNote = {}; this.emit('step', { k: this.pos, count: 0, fired: [], seek: true }); }
@@ -322,30 +398,45 @@ export class Orchestra {
     const rig = this.rig, m = METERS[this.meter], p = this.count % m.len;
     const acc = p === 0 ? 1.3 : m.sec.includes(p) ? 1.1 : 0.82;
     const anySolo = this.anySolo(), sc = this.steps, fired = [];
-    if (rig && this.marker && (k - this.startK) % ROT === 0) playNote(rig, 'pad', hz(BASE_MIDI - 12), t, Math.min(4, stepS * 8), 0.6, rig.bus);
+    this.updateDrone(k, t, stepS);
+    const rot = (x) => Math.floor((x - BARTELS_EPOCH) / (27 * 24 * HOUR_MS));
+    if (rig && this.marker && (k === 0 || rot(this.T[k]) !== rot(this.T[k - 1]))) playNote(rig, 'pad', hz(BASE_MIDI - 12), t, Math.min(4, stepS * 8), 0.6, rig.bus);
     for (const id of ORDER) {
       const ch = this.ch[id]; if (!ch.on) continue;
-      const ds = this.S[id], j = this.mapIdx(id, k); if (j < 0) continue;
-      const v = ds.v[j]; if (!(v > MISSING)) continue;
+      const ds = this.S[id], v = this.R[id][k]; if (!(v > MISSING)) continue; // time-aligned value at this slot
+      const j = Math.max(0, this.mapIdx(id, k));
       const nth = MODE_N[ch.mode];
       const trig = ch.mode === 'change' || ch.mode === 'drone' ? this.lastVal[id] !== v : this.count % nth === 0;
       if (!trig) continue;
       this.lastVal[id] = v;
-      const midi = toMidi(norm(ds, v), sc) + 12 * ch.oct + ch.trans;
+      const cav = id === 'sr' && ch.inst === 'cavity';
+      const midi = cav ? srMidi(srModes(v), ch.oct) : toMidi(norm(ds, v), sc) + 12 * ch.oct + ch.trans;
       this.lastNote[id] = { midi, v, j };
       const audible = !ch.mute && !(anySolo && !ch.solo);
       let hold = stepS * nth * 0.9;
       if (ch.mode === 'drone') {
         let h = 1;
-        while (h < 24 && k + h < this.N) { const j2 = this.mapIdx(id, k + h); if (j2 < 0 || ds.v[j2] !== v) break; h++; }
+        while (h < 24 && k + h < this.N) { if (this.R[id][k + h] !== v) break; h++; }
         hold = h * stepS;
       }
       const vel = Math.min(1, (0.55 + 0.35 * norm(ds, v)) * acc);
       this.stats.notesScheduled++;
-      if (audible) { this.stats.notesAudible++; if (rig && playNote(rig, ch.inst, hz(midi), t, hold, vel, chanNode(rig, id, ch))) this.stats.voicesStarted++; }
-      fired.push({ id, midi, v, j, vel, hold, audible, inst: ch.inst, t });
+      if (audible) {
+        this.stats.notesAudible++;
+        if (cav) { if (rig) { droneSwell(rig, t, vel); this.stats.voicesStarted++; } }
+        else if (rig && playNote(rig, ch.inst, hz(midi), t, hold, vel, chanNode(rig, id, ch))) this.stats.voicesStarted++;
+      }
+      fired.push({ id, midi, v, j, vel, hold, audible, inst: ch.inst, t, modes: id === 'sr' ? srModes(v) : 0, df: id === 'sr' ? this.R.srDf[k] : 0, T: this.T[k] });
     }
-    this.events.push({ t, k, count: this.count, fired });
+    this.events.push({ t, k, count: this.count, fired, stepS });
+  }
+  // the Schumann cavity drone is one continuous voice: its mode levels and pitch glide with the data
+  updateDrone(k, t, stepS) {
+    const rig = this.rig; if (!rig || !this.S) return;
+    const ch = this.ch.sr, v = this.R.sr[k];
+    const on = ch.on && ch.inst === 'cavity' && this.audible('sr') && v > MISSING;
+    if (!on) { droneSet(rig, null, 0, 0, t); return; }
+    droneSet(rig, chanNode(rig, 'sr', ch), v, this.R.srDf[k] || 0, t, ch.oct, Math.max(0.3, stepS * 1.5));
   }
   // called from the render loop: hands over events whose audio time has arrived
   drain() {

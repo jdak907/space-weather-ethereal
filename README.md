@@ -16,6 +16,7 @@ CDN through an import map, so there's no build step.
 | 3 | **Earth's magnetosphere**: magnetopause, bow shock, compressed dipole and tail, solar wind flowing around it | Magnetopause distance from the **Shue et al. (1998)** model using measured dynamic pressure and Bz; field-line stretch and glow follow Kp | Model view (missions like THEMIS, Cluster and MMS map this region) |
 | 4 | **Auroral oval in ultraviolet**: Earth seen from above the North Pole | Kp sets the oval's size and brightness (equatorward edge ≈ 66° − 2°×Kp magnetic latitude, an approximate rule) | Far-UV false color like NASA IMAGE FUV/WIC and Polar UVI |
 | 5 | **Auroral curtains from the ground**: looking north from a high-latitude site | Kp sets the brightness, how high the curtains climb, and the mix of red and violet | Oxygen 557.7 nm (green) and 630.0 nm (red), nitrogen 427.8 nm (violet) |
+| 6 | **Schumann resonances (MODELED)**: Earth with real continents, the ionosphere as a glowing shell, standing-wave modes 1 to 5 (Legendre patterns P1 to P5) breathing between the two, lightning flashing where afternoon storms are for the UTC hour, and a live spectrum panel | A model, labeled "MODELED" everywhere: lightning by time of day from a Natural Earth land mask, plus published space weather shifts driven by live NOAA GOES X-rays and ≥10 MeV protons (see below) | Spectrograms from ELF stations such as Tomsk, Hylaty and Sierra Nevada |
 
 Throughout, you get a deep procedural star field with parallax, bloom, slow drifting camera
 paths, and an auto tour that cross-fades between scenes.
@@ -23,7 +24,7 @@ paths, and an auto tour that cross-fades between scenes.
 **Controls:**
 - Drag to orbit, and scroll or pinch to zoom. In the ground view, drag to look around.
 - Use the scene buttons at the top to jump between scenes.
-- Keys: ←/→ or 1–5 change the scene, **T** toggles the tour, **R** toggles replay, **S** plays or pauses the orchestra, **O** opens the Orchestra panel, **B** toggles the Bartels strip, **H** hides the text, **I** opens About.
+- Keys: ←/→ or 1–6 change the scene, **T** toggles the tour, **R** toggles replay, **S** plays or pauses the orchestra, **O** opens the Orchestra panel, **B** toggles the Bartels strip, **H** hides the text, **I** opens About.
 - **Replay** sweeps through the last ~135 days of Kp, Ap, F10.7 and sunspot number in about four minutes. Solar wind data only covers the last 24 hours, so replay keeps the latest wind values and says so on screen.
 - **Sound** is off by default and starts only after a click (browsers block audio until you interact). It plays the full **Space Weather Sonifier** orchestra, described below.
 
@@ -32,12 +33,12 @@ paths, and an auto tour that cross-fades between scenes.
 The Space Weather Sonifier's sound engine runs inside the visualizer (`js/orchestra.js`), and
 every note shows up in the sky.
 
-- **Seven players, one per data set:** Kp, Ap, F10.7, sunspot number, solar wind speed, density, and Bz. Each one has On, Solo and Mute, a voice, a playing pattern (every step, every 2nd/4th/8th, only when it changes, or held as a drone), an octave, a pitch shift, a volume and a pan.
+- **Nine players, one per data set:** Kp, Ap, F10.7, sunspot number, solar wind speed, density, Bz, GOES X-rays, and Schumann resonance (modeled). Each one has On, Solo and Mute, a voice, a playing pattern (every step, every 2nd/4th/8th, only when it changes, or held as a drone), an octave, a pitch shift, a volume and a pan.
 - **Voices** in the spirit of Brian Eno: airport piano, slow pad with a filter sweep, shimmer glass, soft choir, long bell, simple glass, and pluck.
 - **Rhythm:** tempo from 40 to 160 BPM. Note lengths run from half notes to sixteenth triplets. Groupings of 2, 3, 4, 5 (3+2), 6/8, and 7 (2+2+3) accent the first beat of each group.
 - **Space:** a convolution reverb made in code (45% mix, 9-second tail by default) and a tempo-synced delay (1/4 note, 35% repeats, 25% mix by default).
-- **Presets:** Ambient orchestra (the default), Solo Kp, Storm ensemble, and Everything on.
-- **Timing:** one step is one 3-hour Kp reading, oldest to newest. Daily sets hold for the 8 steps of their day. The solar wind sets only cover the last 24 hours, so they loop (one 10-minute reading per step).
+- **Presets:** Ambient orchestra (the default), Solo Kp, Storm ensemble, Everything on, and Schumann cavity.
+- **Timing:** one shared UTC timeline (see "Timeline and delays" below). The solar wind sets only cover about the last 24 hours, so they are silent before that.
 - **Pitch:** each reading is scaled low to high and snapped to the chosen scale across three octaves from A2 (110 Hz).
 - **Color:** hue = pitch class × 30° on the HSL wheel, with C anchored at red. Lightness by octave is 34/45/56/67%. That puts the primaries red, green and blue on C, E and G#, and the secondaries yellow, cyan and magenta on D, F# and A#.
 
@@ -64,12 +65,79 @@ set switches the strip to it.
 solar wind and magnetosphere, and Bz to the magnetosphere and solar wind).
 
 URL options:
-- `?scene=sun|wind|magneto|oval|curtain` opens a specific scene.
+- `?scene=sun|wind|magneto|oval|curtain|schumann` opens a specific scene.
+- `?demo=1` starts the **Typical storm demo** (illustrative, not real data). `?event=1` turns on event mode. `?window=1d|3d|7d|27d|all` and `?bars=4` set the timeline window and compression.
 - `?tour=0` starts with the tour off.
 - `?live=0` uses only the bundled snapshot.
 - `?quality=low` turns on reduced effects. Phones and touch devices get this automatically.
 - `?orch=1` opens the Orchestra panel. `?strip=0` hides the Bartels strip. `?follow=0` keeps the scenes on the latest data while music plays.
 - `?dwell=12` sets the tour's time per scene in seconds (default 42).
+
+## Schumann resonance (modeled)
+
+There's no open, live, numeric Schumann resonance feed a web page can use. Stations post
+spectrogram pictures, and the numeric data that is open is archival (details and links in
+[`docs/schumann-data-sources.md`](docs/schumann-data-sources.md)). So scene 6 and
+the Schumann player use a **model**, labeled "MODELED" in the scene, the spectrum panel, the readout and the panel:
+
+- **Intensity:** thunderstorms peak around 4 PM local time over tropical land. The model adds that
+  up over a real 1° land mask (Natural Earth 1:110m, public domain, `js/landmask.js`, built by
+  `tools/make_landmask.py`), with the storm belt following the Sun north and south through the year.
+  That gives the "three chimneys": SE Asia around 08 UTC, Africa around 14 to 15 UTC, the Americas around 20 UTC.
+- **Frequencies:** 7.83, 14.3, 20.8, 27.3 and 33.8 Hz, shifted by live NOAA GOES data:
+  X-ray flares raise mode 1 up to +0.2 Hz (C1 → 0, M1 → +0.1, X1 and up → +0.2; Roldugin et al. 2004),
+  and proton events (≥10 MeV ≥ 10 pfu) lower it by 0.15 to 0.4 Hz (Roldugin et al. 2001). Higher modes
+  shift more (mode 2 about 1.75×; modes 3 to 5 are extrapolated [VERIFY]).
+- **Kp** only broadens the peaks a little (illustrative; storm effects on Schumann resonance are small and uncertain).
+- **Sound:** the "Cavity drone" voice plays all five mode frequencies **× 16 (4 octaves up)**:
+  125.3, 228.8, 332.8, 436.8 and 540.8 Hz, as one continuous drone. More lightning = louder and
+  more modes ring (1 mode at the daily low, 5 at the peak). A +0.2 Hz flare shift becomes +3.2 Hz you can hear.
+  The note color is the highest ringing mode's nearest note (B2, A#3, E4, A4, C#5).
+- **Visual reactions:** Schumann notes make the mode patterns and spectrum peaks swell in the note's
+  color and send a sferic ring around the cavity. Elsewhere they make a small glow (a ring at Earth,
+  far-off lightning on the aurora horizon, a faint tropical flash on the UV globe).
+
+## Timeline and delays (cause, then effect)
+
+All data sets sit on **one UTC clock, as experienced at Earth**. Each set keeps its true cadence
+and is held only over its own interval (Kp 3-hourly, Ap, F10.7 and sunspots daily, solar wind
+10-minute means of 1-minute data, GOES X-rays 10-minute maxima so no flare is skipped). Where a
+set has no reading, its player is silent. Nothing is interpolated across gaps.
+
+| Link in the chain | Delay used | How | Source / confidence |
+|---|---|---|---|
+| Flare light (X-rays, EUV), Sun → Earth | **8.3 min** | The Sun scene shows the Sun at emission time (playhead − 8.3 min). GOES measures at Earth, so no shift. | 1 AU ÷ c = 499 s |
+| X-rays → dayside ionosphere (sudden ionospheric disturbance) → Schumann frequency up | about 0 | Same time as the GOES reading | Roldugin et al. 2004 |
+| Flare → solar energetic protons (≥10 MeV) at Earth | **tens of minutes to hours**, measured | Uses GOES proton onset time; the chain says how long after the flare | Depends on magnetic connection [VERIFY typical range] |
+| Protons → Schumann frequency down | +10 min after onset (illustrative) | | Roldugin et al. 2001, 2003 |
+| Solar wind, L1 → Earth's bow shock | **(1.5 million km − 90,000 km) ÷ measured speed**, about 30 to 60 min | Every L1 reading is moved to its arrival time (shown in the readout as "L1 → Earth delay") | L1 distance and bow-shock standoff vary [VERIFY per spacecraft and conditions] |
+| CME, Sun → Earth | **1 to 4 days** | Demo only (real CME tracking isn't connected) | NOAA SWPC [VERIFY] |
+| Southward Bz at the magnetosphere → aurora / Kp | **about 30 min to 3 h** | Chain shows the oval at +45 min and curtains at +90 min (illustrative). Measured Kp is already on Earth time, so it's not shifted. | Substorm growth phase ~30 to 60 min [VERIFY] |
+
+**Events** found in the data: flares ≥ M1 (GOES), proton events ≥ 10 pfu, southward Bz ≤ −5 nT for
+30 min or more (at Earth arrival), and Kp ≥ 5− (4.67). They appear as colored markers on the playhead bar.
+When the playhead passes one, a **Chain of events** panel lists the cause and each effect with its delay,
+the scenes show each stage, and with the tour on, the camera follows the chain from scene to scene.
+
+**Musical time:** in the Orchestra panel, choose the window (24 hours to everything) and the
+compression (1 day = 1 to 32 bars). One step = 1 day ÷ (bars × steps per bar). The default is
+4 bars a day with eighth notes in 4, so one step is 45 minutes. **Event mode** runs quiet stretches
+3× faster and the hours around events 8× slower (at least 2 minutes per step). The notes stay in time order.
+
+**Typical storm demo** (Orchestra panel or `?demo=1`): an illustrative textbook sequence, **not
+real data**, labeled DEMO in the badge, a banner, the bar and the readout. An X2 flare, protons
+about an hour later, a CME arriving about 2 days later with a strong southward Bz, Kp climbing to 7
+with the aurora moving toward mid-latitudes, then recovery. Real data stays the default.
+
+## Times
+
+Every time on screen is shown three ways, in this order: your **local time** with its zone
+(from the browser), **UTC**, and **Greenwich Mean Sidereal Time** (GMST), for example
+`Nov 4, 4:31 PM PST · 00:31 UTC Nov 5 · GMST 03:28`. Phones get a shorter form. GMST uses the standard formula
+GMST = 18.697374558 + 24.06570982441908 × D hours (D = days since 2000-01-01 12:00 UT), with UTC
+in place of UT1 (under 1 s difference). To also see **Local Sidereal Time**, type your longitude in
+About. The app never asks for your location. Test: `node tools/test_time.mjs`, which checks
+J2000.0 (18h41m50.548s) and Meeus, *Astronomical Algorithms*, examples 12.a and 12.b.
 
 ## Honesty rules
 
@@ -83,6 +151,8 @@ URL options:
 | Source | What | How it's used |
 |--------|------|---------------|
 | **NOAA Space Weather Prediction Center (SWPC)**, services.swpc.noaa.gov | Planetary K-index (`products/noaa-planetary-k-index.json`), real-time solar wind plasma and magnetic field (`json/rtsw/rtsw_wind_1m.json`, `json/rtsw/rtsw_mag_1m.json`), 10.7 cm flux (`json/f107_cm_flux.json`), SWPC sunspot number (`json/solar-cycle/swpc_observed_ssn.json`) | Fetched **live in the browser** on every load. These endpoints allow cross-origin requests. Solar wind is averaged into 10-minute means from the active spacecraft, the same way the sonifier does it. |
+| **NOAA SWPC GOES** | X-ray flux 0.1 to 0.8 nm (`json/goes/primary/xrays-1-day.json`) and ≥10 MeV integral protons (`integral-protons-1-day.json`) | Live in the browser (cross-origin allowed); 7-day snapshot in `data.json` from `tools/export_goes.py`. Drives flare and proton-event shifts in the Schumann model and the X-rays player. |
+| **Natural Earth** | 1:110m land polygons (public domain) | Continents in the Schumann scene (`tools/make_landmask.py`) |
 | **GFZ Helmholtz Centre for Geosciences, Potsdam** (kp.gfz.de) | Kp history, Ap, F10.7 observed, international sunspot number (SILSO) | Included in the **bundled snapshot** `data.json` |
 
 If the live fetch fails, the app uses `data.json`. The badge at the top shows **LIVE** (green)
@@ -97,6 +167,7 @@ uses SILSO when it's current and labels SWPC's number when it uses that instead.
 ```bash
 python3 tools/export_data.py            # copy /workspace/spacewx/data.json (refresh.py output)
 python3 tools/export_data.py --refresh  # run the sonifier's refresh.py first, then export
+python3 tools/export_goes.py            # then add the 7-day GOES X-ray + proton snapshot
 ```
 
 Commit the new `data.json` to update what visitors see when the live fetch isn't available.

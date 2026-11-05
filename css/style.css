@@ -37,7 +37,7 @@ nav#picker button.active{border-color:var(--accent);color:#fff;background:rgba(4
 #controls{position:absolute;left:0;right:0;bottom:0;display:flex;flex-wrap:wrap;align-items:center;gap:6px;padding:12px 18px;padding-bottom:max(12px,env(safe-area-inset-bottom))}
 #replay-bar{position:relative;flex:1 1 160px;min-width:140px;height:22px;border-radius:999px;background:var(--glass);border:1px solid rgba(255,255,255,.12);overflow:hidden}
 #replay-fill{position:absolute;inset:0 auto 0 0;width:0;background:linear-gradient(90deg,rgba(127,227,196,.15),rgba(127,227,196,.45))}
-#replay-date{position:relative;display:block;text-align:center;font-size:11.5px;line-height:20px}
+#replay-date{position:relative;z-index:1;text-shadow:0 0 4px #000,0 0 2px #000;display:block;text-align:center;font-size:11.5px;line-height:20px}
 #about{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.55);z-index:10}
 #about[hidden],#fallback[hidden],#replay-bar[hidden]{display:none}
 .about-inner{position:relative;max-width:620px;max-height:84vh;overflow:auto;margin:16px;padding:22px 26px;background:rgba(10,14,24,.92);border:1px solid rgba(255,255,255,.14);border-radius:10px}
@@ -112,3 +112,38 @@ body.orch-open #ui.idle{opacity:1}
   .o-sels{grid-template-columns:repeat(2,minmax(0,1fr))}
 }
 @media (min-width:1101px){body.orch-open #strip-wrap{left:calc(50% - 250px)}}
+/* ---------- Schumann spectrum, chain-of-events HUD, demo banner, timeline markers */
+#sr-wrap{position:absolute;left:18px;top:62px;width:290px;padding:6px 8px;background:var(--glass);border:1px solid rgba(255,255,255,.1);border-radius:8px;backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);opacity:0;pointer-events:none;transition:opacity 1.2s}
+body.sr-on #sr-wrap{opacity:1;pointer-events:auto}
+#sr-spec{display:block;width:100%;height:172px}
+#chain{position:absolute;right:14px;top:58px;width:min(440px,calc(100vw - 28px));padding:8px 12px;background:rgba(8,12,22,.78);border:1px solid rgba(255,190,120,.35);border-radius:8px;font-size:12px;backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);z-index:4}
+#chain[hidden],#demo-banner[hidden]{display:none}
+.ch-head{color:var(--warm);margin-bottom:4px}.ch-head b{font-weight:500;letter-spacing:.14em;text-transform:uppercase;font-size:11px}
+.ch-st{display:grid;grid-template-columns:62px 92px 1fr;gap:6px;opacity:.4;padding:1px 0;transition:opacity .6s}
+.ch-st.done{opacity:.85}.ch-st.now{opacity:1;color:#fff}.ch-st.now .ch-l{color:#ffe2bd}
+.ch-t{font-variant-numeric:tabular-nums;color:var(--accent)}.ch-sc{color:var(--dim)}
+.ch-foot{font-size:10.5px;color:var(--dim);margin-top:3px}
+#demo-banner{position:absolute;top:50px;left:50%;transform:translateX(-50%);padding:3px 12px;border-radius:999px;background:rgba(80,40,0,.6);border:1px solid var(--warm);color:#ffd9a8;font-size:12px;z-index:6}
+.badge.demo .dot{background:var(--warm);box-shadow:0 0 8px var(--warm)}
+#replay-bar .mk{z-index:0;position:absolute;top:2px;bottom:2px;width:3px;margin-left:-1px;border-radius:2px;opacity:.9;pointer-events:auto}
+.mk-flare{background:#ffd27a}.mk-sep{background:#ff6f9a}.mk-cme{background:#ff9a55}.mk-bzs{background:#ff5a4a}.mk-kp5{background:#5dffa0}
+.o-tl{margin:8px 0;padding:6px 8px;border:1px solid rgba(255,255,255,.08);border-radius:8px}
+.o-tl-h{color:var(--accent);font-size:12px;margin-bottom:2px}.o-tl-h small{color:var(--dim);font-size:10.5px}
+.o-tl-s{color:var(--dim);font-size:11px}
+body.orch-open #chain{right:auto;left:18px}
+body.orch-open.sr-on #chain{top:236px}
+@media (max-width:720px){
+  #chain,body.orch-open #chain{left:12px;right:12px;top:auto;bottom:118px;width:auto}
+  #sr-wrap{left:12px;right:12px;top:auto;bottom:126px;width:auto;padding:4px 6px}
+  body.sr-on #strip-wrap{display:none}
+  body.sr-on #readout{display:none}
+  body.sr-on #chain{bottom:380px}
+  #caption{top:128px}
+  #replay-bar{height:auto;min-height:22px}
+  #replay-date{font-size:10.5px;line-height:13px;padding:4px 6px}
+  #sr-spec{height:112px}
+  #chain{font-size:11px}
+  body.sr-on #chain{bottom:300px}
+  .ch-st{grid-template-columns:52px 70px 1fr}
+  body.sr-on #readout{bottom:64px}
+}
