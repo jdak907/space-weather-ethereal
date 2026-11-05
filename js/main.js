@@ -19,6 +19,7 @@ import { createReactions } from './reactions.js';
 import { BartelsStrip } from './strip.js';
 import { buildPanel } from './panel.js';
 import * as spatial from './spatial.js';
+import { airplaySupported, watchAirPlay, mkAudio, OUT_ID, unlockStats } from './audiounlock.js';
 
 // Colors are authored directly in display space; no color-space conversion anywhere.
 THREE.ColorManagement.enabled = false;
@@ -366,6 +367,13 @@ orch.on('note', (n) => {
   reactions.note(n, act);
 });
 $('btn-orch').onclick = () => toggleOrch();
+// lock screen / Control Center play-pause (iOS shows these while the media route is playing)
+orch.msHandlers = { play: () => startOrchestra(), pause: () => { orch.pause(); syncSound(); } };
+// AirPlay: offered only in Safari, and only when WebKit reports an AirPlay target nearby
+if (airplaySupported()) {
+  watchAirPlay(mkAudio(OUT_ID), (ok) => { orch.airplayOk = ok; $('btn-airplay').hidden = !ok; panel.render(); });
+  $('btn-airplay').onclick = () => { const was = orch.playing; orch.airplay(); if (!was) startOrchestra(); };
+}
 $('replay-bar').onclick = (e) => {
   if (!orchFollowing()) return;
   const r = e.currentTarget.getBoundingClientRect();
@@ -399,6 +407,14 @@ function resize() {
 }
 addEventListener('resize', resize);
 resize();
+// measured heights for the phone layout: controls (bar + wrapped buttons), readout, Schumann panel, header
+{
+  const root = document.documentElement.style, H = (id) => { const e = $(id); return e && e.offsetParent !== null ? e.getBoundingClientRect().height : 0; };
+  const sync = () => { root.setProperty('--ctl-h', Math.ceil(H('controls')) + 'px'); root.setProperty('--ro-h', Math.ceil(H('readout')) + 'px');
+    root.setProperty('--sr-h', Math.ceil(H('sr-wrap')) + 'px'); root.setProperty('--top-h', Math.ceil(H('top')) + 'px'); };
+  if (window.ResizeObserver) { const ro = new ResizeObserver(sync); ['controls', 'readout', 'sr-wrap', 'top'].forEach((id) => ro.observe($(id))); }
+  addEventListener('resize', sync); sync();
+}
 
 // ---------- main loop
 let readoutAcc = 0;
@@ -562,5 +578,5 @@ function setDemo(on) {
     lonIn.addEventListener('change', () => { const x = lonIn.value.trim(); setLon(x === '' ? null : x); setBadge(); readout(); drawMarkers(); drawHUD(); $('lon-note').textContent = getLon() === null ? 'Showing GMST only.' : `Showing LST for ${getLon()}°.`; });
   }
   if (params.get('orch') === '1') toggleOrch(true);
-  window.__spacewx = { spatial, THREE, setStripBig, goQueue, get shown() { return shown; }, get D() { return D; }, P, scenes, go, orch, reactions, strip, opt, chainLog, setDemo, clockT, get cur() { return cur; }, get playK() { return playK; } };
+  window.__spacewx = { spatial, THREE, unlockStats, setStripBig, goQueue, get shown() { return shown; }, get D() { return D; }, P, scenes, go, orch, reactions, strip, opt, chainLog, setDemo, clockT, get cur() { return cur; }, get playK() { return playK; } };
 })();

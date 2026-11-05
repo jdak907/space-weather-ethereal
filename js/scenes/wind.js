@@ -142,24 +142,68 @@ export function createWind(ctx) {
   const l1 = new THREE.Mesh(new THREE.SphereGeometry(0.22, 12, 8), new THREE.MeshBasicMaterial({ color: 0xffe08a }));
   l1.position.set(AU - 4.2, 0, 0); scene.add(l1);
 
-  // --- local IMF near Earth: direction tilts north/south with measured Bz
+  // --- near-Earth solar wind plasma. Each streak is a parcel of wind: random start, phase, length
+  // and speed; it flows anti-sunward (+x) at the measured wind speed, is deflected around the bow
+  // shock and magnetopause (parabolic obstacles, the same shapes as the drawn shield), and is
+  // compressed, heated (warmer) and stirred up (turbulence) in the magnetosheath and downstream.
+  // Density sets how many parcels show; color follows the IMF Bz like the spiral field lines.
+  // (Earth-local coordinates: Earth at 0, Sun toward -x. The anchor group below is where the
+  //  Bz ripple and the Bz voice sit.)
   const imf = new THREE.Group(); imf.position.set(AU - 9, 0, 0); scene.add(imf);
-  const imfMat = new THREE.ShaderMaterial({
-    uniforms: { uCol: U.uBzCol, uDist: U.uDist, uFade: U.uFade },
-    vertexShader: `attribute float aS; varying float vS; void main(){ vS=aS; gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0);} `,
-    fragmentShader: `uniform vec3 uCol; uniform float uDist, uFade; varying float vS; void main(){
-      float dash = smoothstep(0.55,1.0, 0.5+0.5*sin(vS*18.0 - uDist*1.5)); float e = sin(3.14159*vS);
-      gl_FragColor = vec4(uCol*(0.15+0.85*dash)*e*0.9*uFade,1.0);} `,
+  const NS = ctx.mobile ? 520 : 1100;
+  const sg = new THREE.BufferGeometry();
+  const sP = new Float32Array(NS * 4 * 3), sB = new Float32Array(NS * 4), sAz = new Float32Array(NS * 4), sPh = new Float32Array(NS * 4),
+    sSp = new Float32Array(NS * 4), sLn = new Float32Array(NS * 4), sRn = new Float32Array(NS * 4), sE = new Float32Array(NS * 4);
+  const ENDS = [0, 0.5, 0.5, 1]; // two segments per streak (tail -> middle -> head) so it can bend
+  for (let i = 0; i < NS; i++) {
+    const b = Math.pow(rnd(), 0.6) * 8.5, az = rnd() * Math.PI * 2, ph = rnd(), sp = 0.72 + 0.56 * rnd(), ln = 0.35 + 1.4 * rnd() * rnd(), rn = rnd();
+    for (let k = 0; k < 4; k++) { const j = i * 4 + k; sB[j] = b; sAz[j] = az; sPh[j] = ph; sSp[j] = sp; sLn[j] = ln; sRn[j] = rn; sE[j] = ENDS[k]; }
+  }
+  sg.setAttribute('position', new THREE.BufferAttribute(sP, 3));
+  [['aB', sB], ['aAz', sAz], ['aPh', sPh], ['aSpd', sSp], ['aLen', sLn], ['aRnd', sRn], ['aEnd', sE]].forEach(([n, a]) => sg.setAttribute(n, new THREE.BufferAttribute(a, 1)));
+  const SU = { uFlow: { value: 0 }, uV: { value: 1 }, uDens: { value: 0.5 }, uTime: U.uTime, uCol: U.uBzCol, uFade: U.uFade };
+  const streakMat = new THREE.ShaderMaterial({
+    uniforms: SU,
+    vertexShader: NOISE + /* glsl */`
+      attribute float aB, aAz, aPh, aSpd, aLen, aRnd, aEnd;
+      uniform float uFlow, uV, uDens, uTime;
+      varying float vA; varying float vHot;
+      const float X0 = -16.0, LX = 29.0;
+      const float XBS = -3.5, KBS = 7.74;   // bow shock: rho^2 = KBS (x - XBS) (matches the drawn shock)
+      const float XMP = -2.3, KMP = 4.2;    // magnetopause (inner obstacle the flow wraps around)
+      vec3 at(float x, float az){
+        // streamline around the obstacle: area-preserving push outward once past the magnetopause nose
+        float rho = sqrt(aB*aB + max(0.0, KMP*(x - XMP)));
+        float sheath = step(rho*rho, KBS*max(0.0, x - XBS) + 0.001);
+        // low-frequency meander along the flow (so a streak bends, it does not point at random)
+        float turb = 0.05 + 0.30*sheath + 0.25*smoothstep(0.0, 8.0, x);
+        float n1 = snoise(vec3(x*0.07 - uTime*0.08, aAz*1.3, aRnd*17.0));
+        float n2 = snoise(vec3(x*0.06 + 3.1, aRnd*11.0, aAz*1.1 + uTime*0.05));
+        rho += n1*turb*(1.0 + 0.15*aB); az += n2*turb*0.08;
+        vHot = sheath;
+        return vec3(x, rho*sin(az), rho*cos(az));
+      }
+      void main(){
+        float s = mod(aPh*LX + uFlow*aSpd, LX);
+        float len = aLen*(0.7 + 1.3*uV)*aSpd;
+        float x = X0 + s - len*(1.0 - aEnd);
+        vec3 p = at(x, aAz);
+        vec4 mv = modelViewMatrix*vec4(p, 1.0); gl_Position = projectionMatrix*mv;
+        float head = X0 + s;
+        float edge = smoothstep(X0, X0 + 3.0, x) * (1.0 - smoothstep(X0 + LX - 6.0, X0 + LX, head));
+        float on = step(aRnd, uDens);
+        vA = on * edge * pow(aEnd, 1.6) * (0.25 + 0.75*fract(aRnd*7.31)) * (0.55 + 0.6*vHot);
+      }`,
+    fragmentShader: /* glsl */`
+      uniform vec3 uCol; uniform float uFade; varying float vA; varying float vHot;
+      void main(){ if (vA < 0.004) discard;
+        vec3 c = mix(mix(uCol, vec3(1.0), 0.35), vec3(1.0, 0.72, 0.45), 0.55*vHot);
+        gl_FragColor = vec4(c*vA*0.7*uFade, 1.0); }`,
     transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
   });
-  const imfLines = [];
-  for (let i = 0; i < 9; i++) {
-    const gg = new THREE.BufferGeometry();
-    const n = 40, p = new Float32Array(n * 3), s = new Float32Array(n);
-    for (let k = 0; k < n; k++) { const u = k / (n - 1); s[k] = u; p.set([0, u * 10 - 5, 0], k * 3); }
-    gg.setAttribute('position', new THREE.BufferAttribute(p, 3)); gg.setAttribute('aS', new THREE.BufferAttribute(s, 1));
-    const ln = new THREE.Line(gg, imfMat); ln.position.set(0, 0, (i - 4) * 1.4); imf.add(ln); imfLines.push(ln);
-  }
+  const streaks = new THREE.LineSegments(sg, streakMat); streaks.frustumCulled = false;
+  { const idx = []; for (let i = 0; i < NS; i++) idx.push(i * 4, i * 4 + 1, i * 4 + 2, i * 4 + 3); sg.setIndex(idx); }
+  earth.add(streaks);
 
   const tmpQ = new THREE.Quaternion();
   return {
@@ -168,8 +212,8 @@ export function createWind(ctx) {
     title: 'Solar wind and the Parker spiral',
     text: 'The Sun blows a constant wind of charged particles at hundreds of km/s. Because the Sun rotates, the magnetic field carried by the wind winds into a spiral, like water from a garden sprinkler. When the field near Earth points south (negative Bz), energy couples into Earth\'s magnetosphere much more easily.',
     instrument: 'Driven by in-situ plasma and magnetometer readings from NOAA\'s real-time solar wind monitors at the L1 point (yellow dot), about 1.5 million km sunward of Earth.',
-    note: 'Not to scale. Particle speed and count follow measured speed and density; spiral pitch uses tan ψ = Ωr/v. Field color: blue = northward Bz, red = southward Bz.',
-    scene, camera, bloom: 0.9, hooks: { U, AU, RS, imf },
+    note: 'Not to scale. Particle speed and count follow measured speed and density; spiral pitch uses tan ψ = Ωr/v. Near Earth, the streaks are parcels of solar wind flowing around the bow shock (warmer where compressed). Color: blue = northward Bz, red = southward Bz.',
+    scene, camera, bloom: 0.9, hooks: { U, AU, RS, imf, SU, streaks },
     orbit: { target: new THREE.Vector3(30, 0, 0), minDistance: 20, maxDistance: 220, home: 95, zoomAmp: 0.2, spin: 0.012, polar: 0.95 },
     update(t, dt, P) {
       const v = Math.max(200, P.swSpeed);
@@ -177,6 +221,9 @@ export function createWind(ctx) {
       const k = (OMEGA_R_AU / v) / AU;
       U.uDist.value += vvis * dt; U.uRot.value += k * vvis * dt; U.uK.value = k; U.uTime.value = t;
       U.uDens.value = THREE.MathUtils.clamp(0.25 + P.swDens / 16, 0.25, 1.0);
+      // near-Earth parcels: speed and length from the measured wind speed, count from density
+      SU.uV.value = v / 400; SU.uFlow.value += dt * (v / 400) * 2.4;
+      SU.uDens.value = THREE.MathUtils.clamp(0.3 + P.swDens / 14, 0.3, 1.0);
       const s = THREE.MathUtils.clamp(-P.bz / 8, -1, 1); // +1 = strongly southward
       const south = new THREE.Color(1.0, 0.36, 0.28), north = new THREE.Color(0.35, 0.7, 1.0), calm = new THREE.Color(0.7, 0.75, 0.9);
       U.uBzCol.value.copy(calm).lerp(s > 0 ? south : north, Math.abs(s));

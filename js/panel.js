@@ -31,7 +31,8 @@ export function buildPanel(root, orch, opts) {
           <button data-act="sptest" id="o-sptest">${o.testing ? '■ Stop test' : '♪ Speaker test'}</button>
           <span class="o-sptest-l" id="o-sptest-l">${testLabel}</span>
         </div>
-        <div class="o-tl-s">Now: ${now}. ${info.mode === 'hrtf' ? 'Use headphones: sounds sit where their data lives in the scene and move as you orbit and zoom.' : info.mode === '5.1' || info.mode === '7.1' ? 'Each voice is panned to the speakers from its place in the scene; the Schumann drone also feeds the subwoofer.' : 'Pan knobs set each voice. Pick Headphones 3D for spatial sound.'}</div>
+        <div class="o-row"><label class="o-route"><input type="checkbox" data-route="1" ${o.route === 'element' ? 'checked' : ''}> Play as media (AirPlay, lock screen; stereo)</label>${o.airplayOk ? '<button data-act="airplay" id="o-airplay">AirPlay…</button>' : ''}</div>
+        <div class="o-tl-s">Now: ${now}${o.route === 'element' ? ' · through the media player (stereo)' : ''}. ${info.mode === 'hrtf' ? 'Use headphones: sounds sit where their data lives in the scene and move as you orbit and zoom.' : info.mode === '5.1' || info.mode === '7.1' ? 'Each voice is panned to the speakers from its place in the scene; the Schumann drone also feeds the subwoofer.' : 'Pan knobs set each voice. Pick Headphones 3D for spatial sound.'}</div>
       </div>`;
   }
   function render() {
@@ -105,6 +106,7 @@ export function buildPanel(root, orch, opts) {
     if (b.dataset.act === 'play') { if (o.playing) o.pause(); else await opts.play(); }
     else if (b.dataset.act === 'stop') o.stop();
     else if (b.dataset.act === 'close') { opts.close(); return; }
+    else if (b.dataset.act === 'airplay') { o.airplay(); render(); }
     else if (b.dataset.act === 'sptest') {
       if (o.testing) { o.testing = false; return; }
       o.speakerTest((name, i, n) => {
@@ -126,6 +128,7 @@ export function buildPanel(root, orch, opts) {
   root.addEventListener('change', (e) => {
     const t = e.target;
     if (t.dataset.out) { o.setOutput(t.value); render(); return; }
+    if (t.dataset.route) { o.ensureRig(); o.setRoute(t.checked ? 'element' : 'direct'); render(); return; }
     if (t.dataset.tl) { orch.tl[t.dataset.tl] = t.dataset.tl === 'barsPerDay' ? +t.value : t.value; orch.retime(); opts.changed(); render(); return; }
     if (t.dataset.tlc) { if (t.dataset.tlc === 'demo') opts.setDemo(t.checked); else { orch.tl.eventMode = t.checked; orch.retime(); opts.changed(); } render(); return; }
     if (t.dataset.t) { const k = t.dataset.t; if (k === 'loop' || k === 'marker') o[k] = t.checked; else opts.set(k, t.checked); return; }

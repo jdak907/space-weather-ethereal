@@ -122,6 +122,17 @@ remembered on this device. **Speaker test** pings each channel in turn and shows
   speakers depends on the system. [VERIFY] it with Speaker test.
 - If a device reports more channels than it accepts, the page falls back to stereo.
 
+## Phones, the silent switch, and AirPlay
+
+iPhone Safari treats web audio as "ambient" sound, so the ringer switch on silent mutes it and AirPlay ignores it. The site now asks for media playback instead (`js/audiounlock.js`):
+
+- **Safari 17+:** `navigator.audioSession.type = 'playback'`, set inside the Sound tap. Sound plays with the switch on silent and follows the phone's output (AirPlay, Bluetooth).
+- **Older iOS:** a silent, looping `<audio playsinline>` starts inside the tap, which moves the page into the playback category.
+- **Play as media (Orchestra → Output):** the whole mix plays through an `<audio x-webkit-airplay="allow">` element fed by a `MediaStreamAudioDestinationNode`. That element is what the **AirPlay** button (shown only when Safari reports an AirPlay target) opens the picker for, and it carries lock-screen title and play/pause (Media Session). This route is stereo; Headphones 3D still works, 5.1/7.1 fall back to stereo.
+- The audio context is created and resumed inside the tap, and resumed again after an interruption (call, Siri) or when the page comes back to the front.
+
+Whether AirPlay picks up the MediaStream-fed element on a real Apple TV, and how much delay it adds, is [VERIFY] on a device. `tools/test_audio_unlock.py` checks the code path in emulation.
+
 ## Schumann resonance (modeled)
 
 There's no open, live, numeric Schumann resonance feed a web page can use. Stations post

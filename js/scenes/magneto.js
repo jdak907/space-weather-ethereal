@@ -151,13 +151,18 @@ export function createMagneto(ctx) {
       varying float vA; varying float vSheath;
       void main(){
         float L = 110.0;
-        float x = 40.0 - mod(aPh*L + uDist, L);
+        float spd = 0.75 + 0.5*fract(aPh*13.71);            // parcels move at slightly different speeds
+        float x = 40.0 - mod(aPh*L + uDist*spd, L);
         // flow wraps around a paraboloid obstacle (approximate magnetopause shape)
         float rhoMP2 = max(0.0, 2.25*uR0*(uR0 - x));
         float rho = sqrt(aB*aB + rhoMP2);
         float rhoBS2 = max(0.0, 4.0*uXbs*(uXbs - x));
         vSheath = step(rho*rho, rhoBS2);
-        vec3 p = vec3(x, rho*cos(aAz), rho*sin(aAz));
+        // gentle turbulence, stronger in the magnetosheath and the wake
+        float tb = 0.25 + 1.2*vSheath + 0.8*smoothstep(0.0, -40.0, x);
+        float w = sin(x*0.21 + aAz*5.0 + uDist*0.13) * sin(x*0.07 - aPh*31.0);
+        rho += tb*w; float az = aAz + 0.04*tb*sin(x*0.15 + aPh*47.0);
+        vec3 p = vec3(x, rho*cos(az), rho*sin(az));
         vec4 mv = modelViewMatrix*vec4(p,1.0); gl_Position = projectionMatrix*mv;
         vA = smoothstep(40.0, 30.0, x) * smoothstep(-70.0, -50.0, x) * step(fract(aPh*7.13), uDens);
         gl_PointSize = (2.0 + vSheath*1.2) * uPR * clamp(60.0/-mv.z, 0.5, 3.0);

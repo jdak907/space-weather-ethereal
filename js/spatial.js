@@ -75,11 +75,16 @@ export class Spatial {
   // wetIn: node that collects the reverb/delay returns; master/comp: the output chain to destination
   constructor(ctx, { dryOut, wetIn, master, comp }) {
     this.ctx = ctx; this.dryOut = dryOut; this.wetIn = wetIn; this.master = master; this.comp = comp;
-    this.maxCh = ctx.destination.maxChannelCount || 2;
+    this.maxCh = this.devMax = ctx.destination.maxChannelCount || 2;
     this.want = 'auto'; this.mode = null; this.voices = {}; this.refDist = 1; this.stats = { listenerUpdates: 0, builds: 0 };
     this.setMode('auto');
   }
   get available() { return availableModes(this.maxCh); }
+  // the media-element route (AirPlay / iOS media) is stereo: cap the channels, or pass null to restore
+  capChannels(n) {
+    const m = n ? Math.min(this.devMax, n) : this.devMax; if (m === this.maxCh) return this.mode;
+    this.maxCh = m; return this.setMode(this.want);
+  }
   get layout() { return LAYOUTS[this.mode] || null; }
   // (re)wire the output format for a mode
   setMode(want) {

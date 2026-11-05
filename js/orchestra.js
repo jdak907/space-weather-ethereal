@@ -8,6 +8,7 @@ export const ROT = 216; // steps in a 27-day Bartels rotation (27 days x 8 three
 export const BARTELS_EPOCH = Date.UTC(1832, 1, 8);
 
 import { Spatial, availableModes } from './spatial.js';
+import { prepareSession, MediaRoute, unlockInGesture, keepAlive, showAirPlayPicker, setMediaSession, unlockStats, isIOS } from './audiounlock.js';
 import { findEvents, chainFor, buildSlots, resample } from './timeline.js';
 export const ORDER = ['kp', 'ap', 'f107', 'sn', 'speed', 'dens', 'bz', 'xr', 'sr'];
 export const SET_INFO = {
@@ -147,8 +148,10 @@ function makeIR(ctx, sec) {
 function buildRig(outWant = 'auto') {
   const Ctor = window.AudioContext || window.webkitAudioContext;
   if (!Ctor) return null;
+  prepareSession(); // iOS: media playback category before the context starts (ignores the silent switch)
   const ctx = new Ctor();
-  const comp = ctx.createDynamicsCompressor(); comp.threshold.value = -16; comp.ratio.value = 4; comp.connect(ctx.destination);
+  const comp = ctx.createDynamicsCompressor(); comp.threshold.value = -16; comp.ratio.value = 4;
+  const route = new MediaRoute(ctx, comp); // comp -> speakers directly, or -> <audio> element (AirPlay)
   const master = ctx.createGain(); master.gain.value = 0.75; master.connect(comp);
   // dry path: channel -> spatial stage (stereo pan / HRTF panner / VBAP) -> dryOut -> dry -> master
   const dryOut = ctx.createGain(); const dry = ctx.createGain(); dryOut.connect(dry); dry.connect(master);
@@ -162,7 +165,7 @@ function buildRig(outWant = 'auto') {
   const lfo = ctx.createOscillator(); lfo.frequency.value = 0.31; const wob = ctx.createGain(); wob.gain.value = 7; lfo.connect(wob); lfo.start();
   const sp = new Spatial(ctx, { dryOut, wetIn, master, comp }); sp.setMode(outWant);
   const marker = ctx.createGain(); marker.connect(sp.input('marker')); marker.connect(bus);
-  return { ctx, master, bus, dry, delay, fb, dWet, conv, rWet, wob, sp, marker, chans: {}, active: 0, revLen: 0 };
+  return { ctx, master, bus, dry, delay, fb, dWet, conv, rWet, wob, sp, marker, route, chans: {}, active: 0, revLen: 0 };
 }
 function applyFx(rig, fx, bpm) {
   const t = rig.ctx.currentTime;
@@ -383,12 +386,41 @@ export class Orchestra {
     this.testing = false; cb && cb(null, names.length, names.length);
     if (!this.playing) rig.master.gain.setTargetAtTime(0, rig.ctx.currentTime, 0.3);
   }
+  // must run synchronously inside a tap/click: creates or resumes the context, starts the iOS
+  // media-session helpers, and re-applies the remembered output route
   ensureRig() {
-    if (!this.rig) this.rig = buildRig(this.outWant);
+    if (!this.rig) {
+      this.rig = buildRig(this.outWant);
+      if (this.rig) keepAlive(this.rig.ctx, () => this.playing || this.testing, this.rig.route);
+    }
     if (!this.rig) return null;
-    if (this.rig.ctx.state === 'suspended') this.rig.ctx.resume();
+    unlockInGesture(this.rig.ctx);
+    if (this.routeWant === 'element' && this.rig.route.mode !== 'element') this.setRoute('element', false);
+    else if (this.rig.route.mode === 'element') this.rig.route.playEl();
     this.refresh();
     return this.rig;
+  }
+  // output route: 'direct' (AudioContext -> speakers; stereo, 3D, 5.1, 7.1) or 'element' (the mix plays
+  // through an <audio> element, so AirPlay, the lock screen and iOS media controls see it; stereo only)
+  get routeWant() { try { return localStorage.getItem('swe.route') || 'direct'; } catch (_e) { return 'direct'; } }
+  get route() { return this.rig ? this.rig.route.mode : this.routeWant; }
+  setRoute(want, save = true) {
+    if (save) try { localStorage.setItem('swe.route', want); } catch (_e) { /* private mode */ }
+    if (!this.rig) return this.emit('state', this);
+    const m = this.rig.route.useElement(want === 'element');
+    this.rig.sp.capChannels(m === 'element' ? 2 : null);
+    this.emit('state', this);
+  }
+  // AirPlay: move the mix onto the media element (inside the tap), then open the system picker
+  airplay() {
+    const rig = this.ensureRig(); if (!rig) return false;
+    if (rig.route.mode !== 'element') this.setRoute('element');
+    return showAirPlayPicker(rig.route.element);
+  }
+  audioStatus() {
+    const r = this.rig;
+    return { ctx: r ? r.ctx.state : null, route: this.route, ios: isIOS, session: navigator.audioSession ? navigator.audioSession.type : null, ...unlockStats,
+      element: r && r.route.element ? { paused: r.route.element.paused, hasStream: !!r.route.element.srcObject, airplay: r.route.element.getAttribute('x-webkit-airplay'), playsinline: r.route.element.hasAttribute('playsinline') } : null };
   }
   now() { return this.rig ? this.rig.ctx.currentTime : performance.now() / 1000; }
   async play() {
@@ -399,11 +431,13 @@ export class Orchestra {
     this.playing = true; this.next = rig.ctx.currentTime + 0.08;
     clearInterval(this.timer); this.timer = setInterval(() => this.tick(), 25);
     rig.master.gain.setTargetAtTime(0.75, rig.ctx.currentTime, 0.1);
+    setMediaSession(this.msHandlers, true);
     this.emit('state', this); return true;
   }
   pause() {
     this.playing = false; clearInterval(this.timer); this.events.length = 0;
     if (this.rig) { this.rig.master.gain.setTargetAtTime(0.0, this.rig.ctx.currentTime, 0.6); droneSet(this.rig, null, 0, 0, this.rig.ctx.currentTime); }
+    setMediaSession(this.msHandlers, false);
     this.emit('state', this);
   }
   stop() { this.pause(); this.pos = this.startK; this.count = 0; this.lastVal = {}; this.lastNote = {}; this.emit('step', { k: this.pos, count: 0, fired: [], seek: true }); }
