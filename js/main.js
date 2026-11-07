@@ -18,6 +18,8 @@ import { Orchestra, noteColor, noteName, SET_INFO } from './orchestra.js';
 import { createReactions } from './reactions.js';
 import { BartelsStrip } from './strip.js';
 import { buildPanel } from './panel.js';
+import { mountUvi } from './uvi-panel.js';
+import { UVI_CONFIG } from './uvi-config.js';
 import * as spatial from './spatial.js';
 import { loadEarth, setEarthAnisotropy, earthStatus } from './earthtex.js';
 import { airplaySupported, watchAirPlay, mkAudio, OUT_ID, unlockStats } from './audiounlock.js';
@@ -188,10 +190,12 @@ function setBadge() {
     .map(([k, v]) => `${k}: ${v ? 'live NOAA SWPC' : 'snapshot'}`);
   b.title = parts.join(' · ') + (D.errors.length ? `\nLive fetch issues: ${D.errors.join('; ')}` : '');
   $('about-status').innerHTML = `<p><b>Right now:</b> ${parts.join(' · ')}.<br>Bundled snapshot generated ${D.generated ? fmtTime(D.generated) : D.snapshotAsOf}.` +
-    (D.errors.length ? `<br>Live fetch issues: ${D.errors.map((e) => e.replace(/</g, '&lt;')).join('; ')}` : '') + '<br>Schumann resonance: <b>modeled</b> (no open live numeric source).</p>';
+    (D.errors.length ? `<br>Live fetch issues: ${D.errors.map((e) => e.replace(/</g, '&lt;')).join('; ')}` : '') + '<br>Schumann resonance: <b>modeled</b> (no open live numeric source).' +
+    `<br>SMILE UVI QuickLook: <b>${uvi.shortStatus()}</b>. Not one of the live feeds, and not for publication without Science Working Team agreement.</p>`;
 }
 
 function readout() {
+  if (D) uvi.sync(clockT());
   if (!D) return;
   const s = scenes[shown >= 0 ? shown : cur];
   const f = (v, d = 0) => (v === null || v === undefined || !isFinite(v) ? '—' : Number(v).toFixed(d));
@@ -208,7 +212,11 @@ function readout() {
     add('L1 → Earth delay', '+' + f(Ptarget.lag, 0) + ' min', 'model');
   }
   if (s.id === 'magneto') { add('Dynamic pressure', f(Dp, 2) + ' nPa', 'model'); add('Magnetopause nose', f(r0, 1) + ' Earth radii', 'model'); }
-  if (s.id === 'oval' || s.id === 'curtain') { add('Kp max, last 24 h', f(Ptarget.kp24, 1)); add('Oval edge (approx.)', '~' + f(ovalEdge(P.kp), 0) + '° mag. lat', 'model'); }
+  if (s.id === 'oval' || s.id === 'curtain') {
+    add('Kp max, last 24 h', f(Ptarget.kp24, 1));
+    add('Oval edge (approx.)', '~' + f(ovalEdge(P.kp), 0) + '° mag. lat', 'model');
+    add('SMILE UVI', uvi.shortStatus());
+  }
   rows.push('<div class="sep"></div>');
   const kpT = endTime(D.kp), swT = endTime(D.sw, 'speed');
   const swNote = clockT() > endTime(D.swE, 'speed') + 3600e3 || clockT() < D.swE.t0 ? ' · no solar wind data at this time (record covers ~24 h), last values held' : ' · solar wind shifted to Earth arrival';
@@ -248,6 +256,8 @@ function setActive(i) { scenes.forEach((s, k) => (s.controls.enabled = k === i))
 function showScene(i) {
   shown = i;
   document.body.classList.toggle('sr-on', scenes[i].id === 'schumann');
+  document.body.classList.toggle('uvi-on', scenes[i].id === 'oval' || scenes[i].id === 'curtain');
+  uvi.sync(D ? clockT() : Date.now());
   document.querySelectorAll('#picker button').forEach((b, k) => b.classList.toggle('active', k === i));
   caption(scenes[i]);
   if (orch.rig) orch.rig.sp.setRefDistance(audioRef(scenes[i]));
@@ -395,7 +405,8 @@ addEventListener('keydown', (e) => {
   else if (k === 't') toggleTour(); else if (k === 'r') toggleReplay(); else if (k === 's') toggleSound();
   else if (k === 'o') toggleOrch(); else if (k === 'b') { setStrip(!opt.strip); panel.render(); }
   else if (k === 'e') { if (!opt.strip) setStrip(true); setStripBig(!strip.big); }
-  else if (k === 'h') toggleText(); else if (k === 'i') toggleAbout(); else if (k === 'escape') toggleAbout(false);
+  else if (k === 'h') toggleText(); else if (k === 'i') toggleAbout();
+  else if (k === 'escape') { if (uvi.zoomOpen() || uvi.consumeEscape()) { if (uvi.zoomOpen()) uvi.closeZoom(); return; } toggleAbout(false); }
   else if (/^[1-6]$/.test(k)) go(+k - 1);
 });
 let lastMove = 0;
@@ -546,6 +557,14 @@ function setDemo(on) {
   if (on && !was && params.get('autoplay') !== '0') startOrchestra();
 }
 
+const uvi = mountUvi($('uvi'), $('uvi-zoom'), {
+  fmtTime: fmt3,
+  config: UVI_CONFIG,
+  clock: () => (D ? clockT() : Date.now()),
+  onChange: () => { if (D) readout(); },
+  slotLabel: () => `Global timeline unchanged: one step is about ${Math.round((orch.slotMs || 45 * 60e3) / 60e3)} min.`,
+});
+
 // ---------- boot
 (async () => {
   const start = byId[params.get('scene')] ?? 0;
@@ -562,6 +581,8 @@ function setDemo(on) {
     console.warn('Snapshot data unavailable', e);
     $('badge-mode').textContent = 'NO DATA';
   }
+  await uvi.applySearch(params);
+  if (params.get('uviZoom') === '1') uvi.openZoom();
   requestAnimationFrame(frame);
   if (D && params.get('live') !== '0') {
     await refreshLive(realD); prepare(realD);
@@ -581,5 +602,5 @@ function setDemo(on) {
     lonIn.addEventListener('change', () => { const x = lonIn.value.trim(); setLon(x === '' ? null : x); setBadge(); readout(); drawMarkers(); drawHUD(); $('lon-note').textContent = getLon() === null ? 'Showing GMST only.' : `Showing LST for ${getLon()}°.`; });
   }
   if (params.get('orch') === '1') toggleOrch(true);
-  window.__spacewx = { spatial, THREE, unlockStats, earthTex: { status: earthStatus }, setStripBig, goQueue, get shown() { return shown; }, get D() { return D; }, P, scenes, go, orch, reactions, strip, opt, chainLog, setDemo, clockT, get cur() { return cur; }, get playK() { return playK; } };
+  window.__spacewx = { spatial, THREE, unlockStats, earthTex: { status: earthStatus }, setStripBig, goQueue, get shown() { return shown; }, get D() { return D; }, P, scenes, go, orch, reactions, strip, opt, chainLog, setDemo, clockT, uvi, get cur() { return cur; }, get playK() { return playK; } };
 })();

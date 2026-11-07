@@ -1,2 +1,6 @@
 screenshots/*.mp4
 __pycache__/
+# Local SMILE UVI QuickLook products from tools/fetch_uvi.py. Real ESA imagery must not be committed.
+local/uvi/
+# Archive filenames, in case a download lands outside local/uvi/
+**/SMILE_UVI_QL*
