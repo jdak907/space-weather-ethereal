@@ -1,0 +1,175 @@
+{
+  "schema": 1,
+  "synthetic": true,
+  "anchor": "now",
+  "format": "png",
+  "endpoint": null,
+  "nominalCadenceMs": 60000,
+  "maxHoldMs": 90000,
+  "label": "SYNTHETIC placeholder frames, not ESA SMILE data",
+  "publication": "Synthetic diagrams generated in this repository. Not ESA imagery.",
+  "frames": [
+    {
+      "id": "syn-00",
+      "offsetMs": -1800000,
+      "obsEndOffsetMs": -1799000,
+      "retrievedOffsetMs": 0,
+      "image": "frames/syn-0.png",
+      "synthetic": true,
+      "label": "SYNTHETIC placeholder, not ESA data"
+    },
+    {
+      "id": "syn-01",
+      "offsetMs": -1740000,
+      "obsEndOffsetMs": -1739000,
+      "retrievedOffsetMs": 0,
+      "image": "frames/syn-1.png",
+      "synthetic": true,
+      "label": "SYNTHETIC placeholder, not ESA data"
+    },
+    {
+      "id": "syn-02",
+      "offsetMs": -1680000,
+      "obsEndOffsetMs": -1679000,
+      "retrievedOffsetMs": 0,
+      "image": "frames/syn-2.png",
+      "synthetic": true,
+      "label": "SYNTHETIC placeholder, not ESA data"
+    },
+    {
+      "id": "syn-03",
+      "offsetMs": -1620000,
+      "obsEndOffsetMs": -1619000,
+      "retrievedOffsetMs": 0,
+      "image": "frames/syn-3.png",
+      "synthetic": true,
+      "label": "SYNTHETIC placeholder, not ESA data"
+    },
+    {
+      "id": "syn-04",
+      "offsetMs": -1560000,
+      "obsEndOffsetMs": -1559000,
+      "retrievedOffsetMs": 0,
+      "image": "frames/syn-4.png",
+      "synthetic": true,
+      "label": "SYNTHETIC placeholder, not ESA data"
+    },
+    {
+      "id": "syn-05",
+      "offsetMs": -660000,
+      "obsEndOffsetMs": -659000,
+      "retrievedOffsetMs": 0,
+      "image": "frames/syn-5.png",
+      "synthetic": true,
+      "label": "SYNTHETIC placeholder, not ESA data"
+    },
+    {
+      "id": "syn-06",
+      "offsetMs": -600000,
+      "obsEndOffsetMs": -599000,
+      "retrievedOffsetMs": 0,
+      "image": "frames/syn-6.png",
+      "synthetic": true,
+      "label": "SYNTHETIC placeholder, not ESA data"
+    },
+    {
+      "id": "syn-07",
+      "offsetMs": -540000,
+      "obsEndOffsetMs": -539000,
+      "retrievedOffsetMs": 0,
+      "image": "frames/syn-7.png",
+      "synthetic": true,
+      "label": "SYNTHETIC placeholder, not ESA data"
+    },
+    {
+      "id": "syn-08",
+      "offsetMs": -480000,
+      "obsEndOffsetMs": -479000,
+      "retrievedOffsetMs": 0,
+      "image": "frames/syn-0.png",
+      "synthetic": true,
+      "label": "SYNTHETIC placeholder, not ESA data"
+    },
+    {
+      "id": "syn-09",
+      "offsetMs": -420000,
+      "obsEndOffsetMs": -419000,
+      "retrievedOffsetMs": 0,
+      "image": "frames/syn-1.png",
+      "synthetic": true,
+      "label": "SYNTHETIC placeholder, not ESA data"
+    },
+    {
+      "id": "syn-10",
+      "offsetMs": -360000,
+      "obsEndOffsetMs": -359000,
+      "retrievedOffsetMs": 0,
+      "image": "frames/syn-2.png",
+      "synthetic": true,
+      "label": "SYNTHETIC placeholder, not ESA data"
+    },
+    {
+      "id": "syn-11",
+      "offsetMs": -300000,
+      "obsEndOffsetMs": -299000,
+      "retrievedOffsetMs": 0,
+      "image": "frames/syn-3.png",
+      "synthetic": true,
+      "label": "SYNTHETIC placeholder, not ESA data"
+    },
+    {
+      "id": "syn-12",
+      "offsetMs": -240000,
+      "obsEndOffsetMs": -239000,
+      "retrievedOffsetMs": 0,
+      "image": "frames/syn-4.png",
+      "synthetic": true,
+      "label": "SYNTHETIC placeholder, not ESA data"
+    },
+    {
+      "id": "syn-13",
+      "offsetMs": -180000,
+      "obsEndOffsetMs": -179000,
+      "retrievedOffsetMs": 0,
+      "image": "frames/syn-5.png",
+      "synthetic": true,
+      "label": "SYNTHETIC placeholder, not ESA data"
+    },
+    {
+      "id": "syn-14",
+      "offsetMs": -120000,
+      "obsEndOffsetMs": -119000,
+      "retrievedOffsetMs": 0,
+      "image": "frames/syn-6.png",
+      "synthetic": true,
+      "label": "SYNTHETIC placeholder, not ESA data"
+    },
+    {
+      "id": "syn-15",
+      "offsetMs": -60000,
+      "obsEndOffsetMs": -59000,
+      "retrievedOffsetMs": 0,
+      "image": "frames/syn-7.png",
+      "synthetic": true,
+      "label": "SYNTHETIC placeholder, not ESA data"
+    },
+    {
+      "id": "syn-16",
+      "offsetMs": 0,
+      "obsEndOffsetMs": 1000,
+      "retrievedOffsetMs": 0,
+      "image": "frames/syn-0.png",
+      "synthetic": true,
+      "label": "SYNTHETIC placeholder, not ESA data"
+    },
+    {
+      "id": "syn-17",
+      "offsetMs": 300000,
+      "obsEndOffsetMs": 301000,
+      "retrievedOffsetMs": 0,
+      "image": "frames/syn-1.png",
+      "synthetic": true,
+      "label": "SYNTHETIC placeholder, not ESA data"
+    }
+  ]
+}

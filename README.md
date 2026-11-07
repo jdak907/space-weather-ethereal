@@ -16,7 +16,7 @@ CDN through an import map, so there's no build step.
 | 1 | **The active Sun**: an animated chromosphere, active regions, glowing loops and occasional flares | F10.7 radio flux (overall activity) and sunspot number (how many regions and loops) | Extreme-UV 304 Å false color (He II, ~50,000 K), as in SDO/AIA and SOHO/EIT |
 | 2 | **Solar wind and the Parker spiral**: plasma streaming from the Sun past Earth | Solar wind speed (particle speed and spiral pitch), density (particle count) and IMF Bz (field color and tilt near Earth: blue is north, red is south) | In-situ plasma and magnetometer data from the L1 monitors |
 | 3 | **Earth's magnetosphere**: magnetopause, bow shock, compressed dipole and tail, solar wind flowing around it | Magnetopause distance from the **Shue et al. (1998)** model using measured dynamic pressure and Bz; field-line stretch and glow follow Kp | Model view (missions like THEMIS, Cluster and MMS map this region) |
-| 4 | **Auroral oval in ultraviolet**: Earth seen from above the North Pole | Kp sets the oval's size and brightness (equatorward edge ≈ 66° − 2°×Kp magnetic latitude, an approximate rule) | Far-UV false color like NASA IMAGE FUV/WIC and Polar UVI |
+| 4 | **Auroral oval in ultraviolet**: Earth seen from above the North Pole | Kp sets the oval's size and brightness (equatorward edge ≈ 66° − 2°×Kp magnetic latitude, an approximate rule). The globe stays this model. A separate SMILE UVI panel is off until you opt in | Far-UV false color like NASA IMAGE FUV/WIC and Polar UVI |
 | 5 | **Auroral curtains from the ground**: looking north from a high-latitude site | Kp sets the brightness, how high the curtains climb, and the mix of red and violet | Oxygen 557.7 nm (green) and 630.0 nm (red), nitrogen 427.8 nm (violet) |
 | 6 | **Schumann resonances (MODELED)**: Earth with real continents, the ionosphere as a glowing shell, standing-wave modes 1 to 5 (Legendre patterns P1 to P5) breathing between the two, lightning flashing where afternoon storms are for the UTC hour, and a live spectrum panel | A model, labeled "MODELED" everywhere: lightning by time of day from a Natural Earth land mask, plus published space weather shifts driven by live NOAA GOES X-rays and ≥10 MeV protons (see below) | Spectrograms from ELF stations such as Tomsk, Hylaty and Sierra Nevada |
 
@@ -78,6 +78,7 @@ URL options:
 - `?quality=low` turns on reduced effects. Phones and touch devices get this automatically.
 - `?orch=1` opens the Orchestra panel. `?strip=0` hides the Bartels strip. `?follow=0` keeps the scenes on the latest data while music plays.
 - `?dwell=12` sets the tour's time per scene in seconds (default 42).
+- `?uvi=synthetic` loads labeled synthetic UVI diagrams (not ESA images). `?uvi=local` loads `local/uvi/catalog.json` if you have fetched one. `?uviZoom=1` opens the minutes-scale aurora window. None of these call ESA by themselves.
 
 ## Spatial audio: stereo, headphones 3D, 5.1 and 7.1
 
@@ -173,6 +174,7 @@ set has no reading, its player is silent. Nothing is interpolated across gaps.
 | Solar wind, L1 → Earth's bow shock | **(1.5 million km − 90,000 km) ÷ measured speed**, about 30 to 60 min | Every L1 reading is moved to its arrival time (shown in the readout as "L1 → Earth delay") | L1 distance and bow-shock standoff vary [VERIFY per spacecraft and conditions] |
 | CME, Sun → Earth | **1 to 4 days** | Demo only (real CME tracking isn't connected) | NOAA SWPC [VERIFY] |
 | Southward Bz at the magnetosphere → aurora / Kp | **about 30 min to 3 h** | Chain shows the oval at +45 min and curtains at +90 min (illustrative). Measured Kp is already on Earth time, so it's not shifted. | Substorm growth phase ~30 to 60 min [VERIFY] |
+| SMILE UVI QuickLook image | **none** | Direct view of the aurora. Shown only inside that frame's validity interval, at the observation time. No L1 shift. A gap blanks the panel. | Exposure time, not a propagated solar-wind product. Cadence below |
 
 **Events** found in the data: flares ≥ M1 (GOES), proton events ≥ 10 pfu, southward Bz ≤ −5 nT for
 30 min or more (at Earth arrival), and Kp ≥ 5− (4.67). They appear as colored markers on the playhead bar.
@@ -181,7 +183,7 @@ the scenes show each stage, and with the tour on, the camera follows the chain f
 
 **Musical time:** in the Orchestra panel, choose the window (24 hours to everything) and the
 compression (1 day = 1 to 32 bars). One step = 1 day ÷ (bars × steps per bar). The default is
-4 bars a day with eighth notes in 4, so one step is 45 minutes. **Event mode** runs quiet stretches
+4 bars a day with eighth notes in 4, so one step is 45 minutes. That step is unchanged by the UVI panel. **Aurora window** (on the UVI panel) scrubs QuickLook frames at their own cadence, in minutes, and does not move this playhead. **Event mode** runs quiet stretches
 3× faster and the hours around events 8× slower (at least 2 minutes per step). The notes stay in time order.
 
 **Typical storm demo** (Orchestra panel or `?demo=1`): an illustrative textbook sequence, **not
@@ -204,7 +206,8 @@ J2000.0 (18h41m50.548s) and Meeus, *Astronomical Algorithms*, examples 12.a and 
 - **No data is invented.** Missing readings (`-999`) are skipped. If no reading exists, the display shows "—".
 - **Measured vs. modeled is labeled.** Purple values in the readout are model estimates: dynamic pressure, magnetopause distance and the oval edge.
 - **Visuals are procedural and stylized.** Sizes and distances aren't to scale. Flare timing, active-region positions, substorm brightenings and curtain shapes are illustrative. The captions say so in each scene.
-- **No images are used.** Everything is generated in shaders. SOHO, SDO, IMAGE and Polar are named only as visual-style references.
+- **The globes and curtains are procedural.** Sizes and distances aren't to scale. Flare timing, active-region positions, substorm brightenings and curtain shapes are illustrative. The captions say so in each scene. SOHO, SDO, IMAGE and Polar are named only as visual-style references. The ultraviolet globe and the ground curtains stay the Kp model.
+- **SMILE UVI images are opt-in.** The page does not fetch ESA. Until a catalog is loaded, the panel says "SMILE UVI feed off - enable a local source to view QuickLook frames". Real QuickLook files are not in this repository. The synthetic demo is labeled as such.
 
 ## Data
 
@@ -215,6 +218,7 @@ J2000.0 (18h41m50.548s) and Meeus, *Astronomical Algorithms*, examples 12.a and 
 | **Natural Earth** | 1:110m land polygons (public domain) | Continents in the Schumann scene (`tools/make_landmask.py`) |
 | **NASA Earth Observatory** | Blue Marble: Next Generation (Sept 2004, topography + bathymetry) and Black Marble 2016 night lights; NASA imagery, public domain in the US, credit NASA | The real Earth on every globe: `assets/` (2K on phones, 4K on desktop), ocean glint, city lights, coastlines in the UV oval. Details in `assets/README.md` and `NOTICE` |
 | **GFZ Helmholtz Centre for Geosciences, Potsdam** (kp.gfz.de) | Kp history, Ap, F10.7 observed, international sunspot number (SILSO) | Included in the **bundled snapshot** `data.json` |
+| **ESA / CAS SMILE UVI** QuickLook | Preliminary, uncalibrated auroral images (N₂ LBH). Public PNG products exist; this site does not download them | Opt-in only. Off until a local catalog, a session URL, or the synthetic demo is loaded. Citations below |
 
 If the live fetch fails, the app uses `data.json`. The badge at the top shows **LIVE** (green)
 or **SNAPSHOT** (amber) and "data as of …". Hover over it, or open About, to see the status of
@@ -222,6 +226,48 @@ each source.
 
 The SWPC sunspot number is on a different scale from the international (SILSO) number. The app
 uses SILSO when it's current and labels SWPC's number when it uses that instead.
+
+### SMILE UVI QuickLook (added feed, off by default)
+
+The Kp, Ap, F10.7, sunspot, solar-wind, IMF Bz, and GOES feeds are unchanged. Schumann stays modeled. The ultraviolet globe stays the Kp model. UVI is a separate panel on the UV-oval and curtain scenes.
+
+The feed is off until a local catalog, a session URL, or the synthetic demo is loaded. The deployed page does not request ESA, and real QuickLook files are gitignored (`local/uvi/` and any `SMILE_UVI_QL*` name). GitHub Pages cannot read the product files: the endpoint sends no CORS header for `https://jdak907.github.io`, and OPTIONS returns 403, so a separate fetch step writes the catalog. ESA's SMILE data policy (KX-05-GZ-YJ-01, 21/03/2022) is on the [archive page](https://www.cosmos.esa.int/web/smile/archive).
+
+**Citations**
+
+- Wang, C., Branduardi-Raymont, G., Escoubet, C.P. et al. Solar Wind Magnetosphere Ionosphere Link Explorer (SMILE): Science and Mission Overview. Space Sci Rev 221, 9 (2025). https://doi.org/10.1007/s11214-024-01126-6 (cite with any SMILE material)
+- Zhang, XX., Wang, YM., He, F. et al. Ultraviolet Imager (UVI) for the SMILE Mission. Space Sci Rev 221, 31 (2025). https://doi.org/10.1007/s11214-025-01160-y (cite when using UVI data)
+
+**Clock.** Each frame keeps an observation time and a retrieval time. The panel uses the observation time, with no L1 delay. Validity is `[observation, next observation)` when the next frame arrives within 90 seconds, which covers the 30 s and 60 s spacings below. A longer hole ends the frame after 60 seconds and the panel goes blank with "no SMILE coverage". An old frame is not held through that hole, and a frame that has not started yet is not shown as current. The status line says "latest available, age …", not "live". The 90 s and 60 s limits are settings (`maxHoldMs`, `nominalCadenceMs`) because the archive's own `end_time` is not a usable window (see below).
+
+**Aurora window.** The musical timeline still uses about 45 minutes per step. The aurora window scrubs the loaded frames at their own cadence and does not move the playhead.
+
+**How to turn it on, locally**
+
+```bash
+python3 tools/fetch_uvi.py --fetch --max-frames 24   # writes local/uvi/ (gitignored)
+# then open http://localhost:8000/?scene=oval&tour=0&uvi=local
+```
+
+Or use **Synthetic demo** on the panel, or `?uvi=synthetic`. Those diagrams are generated in `data/uvi-synthetic/` and are not ESA images. A catalog URL typed into the panel is kept for that tab only and is not saved. The format and the ESA endpoints are flags on the script (`--format`, `--tap`, `--product`). The browser's `js/uvi-config.js` leaves `endpoint` null and `loadLocalCatalog` false.
+
+**Confirmed on 2026-11-07, anonymous, no login** (details and the queries are in [`docs/smile-uvi.md`](docs/smile-uvi.md)):
+
+- TAP `https://emds.esac.esa.int/service/tap/sync` answers ADQL. `smile.v_ql_data_file` then held 60,820 UVI / AURORA QuickLook rows. `smile.v_data_file` publicly listed only GSS auxiliary files (1,788), no UVI science CDF.
+- Products are PNG, 512×512, 8-bit RGBA, about 320 KB. Example name: `SMILE_UVI_QL_AURORA_20261104T110508_V01.png`. Downloaded with `GET https://emds.esac.esa.int/service/data?retrieval_type=PRODUCT&QUERY=SELECT filename, filepath FROM smile.v_ql_data_file_latest WHERE ql_data_item_id='…'&FORMAT=PNG`.
+- `begin_time` and `end_time` differ by exactly 1.0 s on every file sampled. Spacing between files is about 30 s or about 60 s for a given stretch, with shorter and longer holes.
+- Newest file at check time: observation 2026-11-04T11:05:08Z, ingested 2026-11-04T23:33:32Z (about 12.5 h later). No files on 2026-11-05, 06, or 07 as of about 00:17 UTC. Ingest delay on 2026-11-03 was about 24–47 h. Older days include a bulk load around 2026-10-27, so those delays are not the operational lag.
+- The product response had no `Access-Control-Allow-Origin` for `https://jdak907.github.io`, and an OPTIONS preflight returned 403. A browser page on GitHub Pages cannot read the files directly.
+- The "public" TAP Python script linked from the programmatic-access page redirects to a Cosmos login. The TAP queries themselves did not.
+
+**Not confirmed, so not assumed:**
+
+- Whether the 1.0 s `end_time` is the exposure. Zhang et al. 2025 describe a default one-minute coadd (30 s in storms). The panel does not treat the 1 s metadata span as the display window.
+- A single typical delay after observation. Recent products were roughly half a day to two days behind, and the archive was then silent for more than two days. Perigee downlink was not measured directly.
+- Pixel contents of the PNG (a rendered plot versus a detector frame). Dimensions match the 512×512 detector in the instrument paper. The image was not inspected.
+- That the product URL, the views, or CORS stay as they were that day. Calibrated L2 map products (CDF, one-year proprietary period) were not opened.
+
+Literature, not an archive measurement: UVI images the N₂ LBH band around 160–180 nm, from a roughly 50-hour orbit with auroral viewing for much of the high-altitude arc, and science data come down near perigee (Zhang et al. 2025; Wang et al. 2025).
 
 ### Refreshing the bundled snapshot
 
@@ -253,6 +299,8 @@ python3 tools/shoot.py --mobile   # phone-sized viewport
 python3 tools/test_combo.py       # orchestra + reactions test, writes screenshots/combo-*.png
 python3 tools/test_spatial.py     # HRTF graph, listener follows camera, 2/6/8-channel logic, OfflineAudioContext channel energy
 node tools/test_time.mjs          # GMST/LST unit test
+node tools/test_uvi.mjs           # UVI validity, gaps, synthetic catalog
+python3 tools/fetch_uvi.py --self-test
 python3 tools/record_tour.py http://localhost:8931/ 120   # silent tour video, screenshots/combo-tour.webm (convert to mp4 with ffmpeg)
 ```
 
@@ -285,5 +333,6 @@ keeps Kp and the solar wind current for visitors.
 - Data: NOAA SWPC; GFZ Potsdam (Kp/Ap: Matzka et al. 2021, doi:10.5880/Kp.0001); SILSO, Royal Observatory of Belgium (sunspot number); DRAO Penticton (F10.7).
 - Magnetopause model: Shue, J.-H., et al. (1998), J. Geophys. Res., 103(A8), 17691–17700.
 - 3D: [Three.js](https://threejs.org) (MIT). Simplex noise GLSL: Ian McEwan and Ashima Arts, [webgl-noise](https://github.com/ashima/webgl-noise) (MIT).
-- Visual style references only (no imagery used): NASA SDO/AIA, ESA/NASA SOHO/EIT, NASA IMAGE FUV, NASA Polar UVI.
+- Visual style references only (no spacecraft imagery on the globes): NASA SDO/AIA, ESA/NASA SOHO/EIT, NASA IMAGE FUV, NASA Polar UVI.
+- SMILE UVI, when a catalog is loaded: Wang et al., Space Sci Rev 221, 9 (2025), doi:10.1007/s11214-024-01126-6, and Zhang et al., Space Sci Rev 221, 31 (2025), doi:10.1007/s11214-025-01160-y. QuickLook is preliminary and uncalibrated. No ESA image is bundled.
 - Made by Jeff Dumps ([@jdak907](https://github.com/jdak907)). Code is under the MIT License (see `LICENSE`).

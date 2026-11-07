@@ -94,11 +94,11 @@ export function createOval(ctx) {
   const hooks = { RE, U, kick: 0 };
   return {
     id: 'oval', label: 'UV oval', bloom: 0.75, hooks,
-    kicker: 'Scene 4 · From orbit',
+    kicker: 'Scene 4 · From orbit · Kp model',
     title: 'The auroral oval in ultraviolet',
     text: 'Seen from high above the North Pole, the aurora forms a glowing ring around the magnetic pole. When geomagnetic activity (Kp) rises, the ring brightens and widens toward the equator, which is why big storms bring the aurora to lower latitudes. The day side glows too, from sunlit air.',
     instrument: 'False-color style of far-ultraviolet imagers such as NASA IMAGE FUV/WIC and Polar UVI (about 130 to 190 nm, nitrogen LBH bands), which could see the aurora even in sunlight.',
-    note: 'Visualization. Oval size and brightness follow measured Kp via an approximate rule (equatorward edge ≈ 66° − 2°×Kp magnetic latitude). Substorm brightenings are illustrative. Sun is to the right; grid lines mark 50°–80° latitude.',
+    note: 'Model layer, driven by Kp, not a SMILE image. Oval size and brightness follow measured Kp via an approximate rule (equatorward edge ≈ 66° − 2°×Kp magnetic latitude). Substorm brightenings are illustrative. Sun is to the right; grid lines mark 50°–80° latitude. A separate panel can show preliminary SMILE UVI frames when that feed is turned on.',
     scene, camera,
     orbit: { target: new THREE.Vector3(0, 0, 0), minDistance: 12, maxDistance: 120, home: 30, zoomAmp: 0.12, spin: 0.02, polar: 0.32 },
     update(t, dt, P) {
@@ -219,11 +219,11 @@ export function createCurtain(ctx) {
   const hooks = { U, curtains, kick: 0, tint: new THREE.Color(0, 0, 0) };
   return {
     id: 'curtain', hooks, label: 'Aurora', bloom: 1.0,
-    kicker: 'Scene 5 · From the ground',
+    kicker: 'Scene 5 · From the ground · Kp model',
     title: 'Auroral curtains',
     text: 'Electrons guided down Earth\'s field lines strike oxygen and nitrogen 100 to 300 km up. Oxygen glows green low down and deep red higher up; nitrogen adds a purple-pink lower edge in strong displays. Higher Kp means brighter curtains that climb higher in the sky and reach farther south.',
     instrument: 'Emission lines: oxygen 557.7 nm (green) and 630.0 nm (red), nitrogen 427.8 nm (blue-violet), as recorded by all-sky cameras such as those at UAF\'s Poker Flat Research Range.',
-    note: 'Stylized view looking north from a high-latitude site. Brightness, height and color mix follow measured Kp; the curtain shapes and motion are procedural.',
+    note: 'Model layer from Kp, not a SMILE image. Stylized view looking north from a high-latitude site. Brightness, height and color mix follow measured Kp; the curtain shapes and motion are procedural.',
     scene, camera,
     orbit: { lookAround: true, eye, dir: new THREE.Vector3(0, 0.22, -1).normalize(), yawAmp: 0.35, pitch: 0.2 },
     update(t, dt, P) {

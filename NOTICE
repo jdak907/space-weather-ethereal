@@ -8,3 +8,6 @@ Third-party content:
 - Land mask in js/landmask.js: Natural Earth 1:110m land, public domain.
 - three.js (MIT License), loaded from jsDelivr.
 - Space weather data: NOAA SWPC (public domain) and GFZ Potsdam (see README.md for terms).
+- SMILE UVI QuickLook is not bundled. Diagrams in data/uvi-synthetic/ are synthetic placeholders, not ESA images.
+  Cite Wang et al., Space Sci Rev 221, 9 (2025), doi:10.1007/s11214-024-01126-6, and, when UVI data
+  are used, Zhang et al., Space Sci Rev 221, 31 (2025), doi:10.1007/s11214-025-01160-y.
