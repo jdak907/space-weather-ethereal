@@ -31,10 +31,10 @@ with sync_playwright() as p:
     pg.on("request", lambda r: hits.append(r.url))
     pg.on("pageerror", lambda e: errs.append(str(e)))
     pg.goto(a.base + "?scene=oval&tour=0&live=0", wait_until="load")
-    pg.wait_for_function("() => document.body.classList.contains('uvi-on') && document.getElementById('uvi').innerText.includes('pending Science Working Team')")
+    pg.wait_for_function("() => document.body.classList.contains('uvi-on') && document.getElementById('uvi').innerText.includes('SMILE UVI feed off')")
     pg.wait_for_timeout(2500)
     text = pg.inner_text("#uvi")
-    if "SMILE UVI feed pending Science Working Team agreement" not in text:
+    if "SMILE UVI feed off - enable a local source to view QuickLook frames" not in text:
         problems.append("placeholder text missing")
     if "preliminary" not in text or "uncalibrated" not in text or "ESA / CAS" not in text:
         problems.append("labels missing: " + text[:240])
@@ -43,7 +43,7 @@ with sync_playwright() as p:
     readout = pg.inner_text("#readout")
     if "Kp" not in readout or "Oval edge" not in readout:
         problems.append("Kp model readout missing: " + readout)
-    if "pending SWT" not in readout:
+    if "SMILE UVI" not in readout or "off" not in readout:
         problems.append("readout UVI status: " + readout)
     cap = pg.inner_text("#caption")
     if "Kp model" not in cap and "Model layer" not in cap:

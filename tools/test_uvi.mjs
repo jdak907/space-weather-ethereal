@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import {
-  PENDING, NO_COVERAGE, assignValidity, frameAt, latestAt, describe, normalizeCatalog, fmtAge, pendingCatalog,
+  FEED_OFF, NO_COVERAGE, assignValidity, frameAt, latestAt, describe, normalizeCatalog, fmtAge, offCatalog,
 } from '../js/uvi.mjs';
 import { createUviVoice, uviSample } from '../js/uvi-audio.mjs';
 
@@ -60,9 +60,9 @@ const ahead = describe({ enabled: true, frames: future }, NOW + 300_000, NOW);
 assert.equal(ahead.frame.id, 'ahead');
 assert.equal(ahead.showingFuture, true);
 
-const off = describe(pendingCatalog(), NOW, NOW);
-assert.equal(off.state, 'pending');
-assert.equal(off.detail, PENDING);
+const off = describe(offCatalog(), NOW, NOW);
+assert.equal(off.state, 'off');
+assert.equal(off.detail, FEED_OFF);
 assert.equal(fmtAge(12_000), '12 s');
 assert.equal(fmtAge(5 * 60_000), '5 min');
 assert.equal(fmtAge(3 * 3600e3), '3.0 h');

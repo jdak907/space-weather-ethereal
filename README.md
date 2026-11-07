@@ -207,7 +207,7 @@ J2000.0 (18h41m50.548s) and Meeus, *Astronomical Algorithms*, examples 12.a and 
 - **Measured vs. modeled is labeled.** Purple values in the readout are model estimates: dynamic pressure, magnetopause distance and the oval edge.
 - **Visuals are procedural and stylized.** Sizes and distances aren't to scale. Flare timing, active-region positions, substorm brightenings and curtain shapes are illustrative. The captions say so in each scene.
 - **The globes and curtains are procedural.** Sizes and distances aren't to scale. Flare timing, active-region positions, substorm brightenings and curtain shapes are illustrative. The captions say so in each scene. SOHO, SDO, IMAGE and Polar are named only as visual-style references. The ultraviolet globe and the ground curtains stay the Kp model.
-- **SMILE UVI images are opt-in.** The page does not fetch ESA. Until a catalog is loaded, the panel says "SMILE UVI feed pending Science Working Team agreement". Real QuickLook files are not in this repository. The synthetic demo is labeled as such.
+- **SMILE UVI images are opt-in.** The page does not fetch ESA. Until a catalog is loaded, the panel says "SMILE UVI feed off - enable a local source to view QuickLook frames". Real QuickLook files are not in this repository. The synthetic demo is labeled as such.
 
 ## Data
 
@@ -218,7 +218,7 @@ J2000.0 (18h41m50.548s) and Meeus, *Astronomical Algorithms*, examples 12.a and 
 | **Natural Earth** | 1:110m land polygons (public domain) | Continents in the Schumann scene (`tools/make_landmask.py`) |
 | **NASA Earth Observatory** | Blue Marble: Next Generation (Sept 2004, topography + bathymetry) and Black Marble 2016 night lights; NASA imagery, public domain in the US, credit NASA | The real Earth on every globe: `assets/` (2K on phones, 4K on desktop), ocean glint, city lights, coastlines in the UV oval. Details in `assets/README.md` and `NOTICE` |
 | **GFZ Helmholtz Centre for Geosciences, Potsdam** (kp.gfz.de) | Kp history, Ap, F10.7 observed, international sunspot number (SILSO) | Included in the **bundled snapshot** `data.json` |
-| **ESA / CAS SMILE UVI** QuickLook | Preliminary, uncalibrated auroral images (N₂ LBH). Public PNG products exist; this site does not download them | Opt-in only. Placeholder until a local catalog or a session URL is loaded. Not for publication without Science Working Team agreement. Citations below |
+| **ESA / CAS SMILE UVI** QuickLook | Preliminary, uncalibrated auroral images (N₂ LBH). Public PNG products exist; this site does not download them | Opt-in only. Off until a local catalog, a session URL, or the synthetic demo is loaded. Citations below |
 
 If the live fetch fails, the app uses `data.json`. The badge at the top shows **LIVE** (green)
 or **SNAPSHOT** (amber) and "data as of …". Hover over it, or open About, to see the status of
@@ -231,7 +231,7 @@ uses SILSO when it's current and labels SWPC's number when it uses that instead.
 
 The Kp, Ap, F10.7, sunspot, solar-wind, IMF Bz, and GOES feeds are unchanged. Schumann stays modeled. The ultraviolet globe stays the Kp model. UVI is a separate panel on the UV-oval and curtain scenes.
 
-ESA's SMILE data policy (excerpt of KX-05-GZ-YJ-01, 21/03/2022, on the [archive page](https://www.cosmos.esa.int/web/smile/archive)) says QuickLook plots should not be used for publication except with agreement from the Science Working Team. That agreement is not in place. The deployed page therefore does not request ESA, and real QuickLook files are gitignored (`local/uvi/` and any `SMILE_UVI_QL*` name).
+The feed is off until a local catalog, a session URL, or the synthetic demo is loaded. The deployed page does not request ESA, and real QuickLook files are gitignored (`local/uvi/` and any `SMILE_UVI_QL*` name). GitHub Pages cannot read the product files: the endpoint sends no CORS header for `https://jdak907.github.io`, and OPTIONS returns 403, so a separate fetch step writes the catalog. ESA's SMILE data policy (KX-05-GZ-YJ-01, 21/03/2022) is on the [archive page](https://www.cosmos.esa.int/web/smile/archive).
 
 **Citations**
 
@@ -255,7 +255,7 @@ Or use **Synthetic demo** on the panel, or `?uvi=synthetic`. Those diagrams are 
 
 - TAP `https://emds.esac.esa.int/service/tap/sync` answers ADQL. `smile.v_ql_data_file` then held 60,820 UVI / AURORA QuickLook rows. `smile.v_data_file` publicly listed only GSS auxiliary files (1,788), no UVI science CDF.
 - Products are PNG, 512×512, 8-bit RGBA, about 320 KB. Example name: `SMILE_UVI_QL_AURORA_20261104T110508_V01.png`. Downloaded with `GET https://emds.esac.esa.int/service/data?retrieval_type=PRODUCT&QUERY=SELECT filename, filepath FROM smile.v_ql_data_file_latest WHERE ql_data_item_id='…'&FORMAT=PNG`.
-- `begin_time` and `end_time` differ by exactly 1.0 s on every file sampled. Spacing between files is about 30 s or about 60 s, depending on the stretch, with shorter and longer holes.
+- `begin_time` and `end_time` differ by exactly 1.0 s on every file sampled. Spacing between files is about 30 s or about 60 s for a given stretch, with shorter and longer holes.
 - Newest file at check time: observation 2026-11-04T11:05:08Z, ingested 2026-11-04T23:33:32Z (about 12.5 h later). No files on 2026-11-05, 06, or 07 as of about 00:17 UTC. Ingest delay on 2026-11-03 was about 24–47 h. Older days include a bulk load around 2026-10-27, so those delays are not the operational lag.
 - The product response had no `Access-Control-Allow-Origin` for `https://jdak907.github.io`, and an OPTIONS preflight returned 403. A browser page on GitHub Pages cannot read the files directly.
 - The "public" TAP Python script linked from the programmatic-access page redirects to a Cosmos login. The TAP queries themselves did not.
@@ -266,7 +266,6 @@ Or use **Synthetic demo** on the panel, or `?uvi=synthetic`. Those diagrams are 
 - A single typical delay after observation. Recent products were roughly half a day to two days behind, and the archive was then silent for more than two days. Perigee downlink was not measured directly.
 - Pixel contents of the PNG (a rendered plot versus a detector frame). Dimensions match the 512×512 detector in the instrument paper. The image was not inspected.
 - That the product URL, the views, or CORS stay as they were that day. Calibrated L2 map products (CDF, one-year proprietary period) were not opened.
-- Science Working Team permission to publish QuickLook plots. There is none recorded here.
 
 Literature, not an archive measurement: UVI images the N₂ LBH band around 160–180 nm, from a roughly 50-hour orbit with auroral viewing for much of the high-altitude arc, and science data come down near perigee (Zhang et al. 2025; Wang et al. 2025).
 
@@ -335,5 +334,5 @@ keeps Kp and the solar wind current for visitors.
 - Magnetopause model: Shue, J.-H., et al. (1998), J. Geophys. Res., 103(A8), 17691–17700.
 - 3D: [Three.js](https://threejs.org) (MIT). Simplex noise GLSL: Ian McEwan and Ashima Arts, [webgl-noise](https://github.com/ashima/webgl-noise) (MIT).
 - Visual style references only (no spacecraft imagery on the globes): NASA SDO/AIA, ESA/NASA SOHO/EIT, NASA IMAGE FUV, NASA Polar UVI.
-- SMILE UVI, when a catalog is loaded: Wang et al., Space Sci Rev 221, 9 (2025), doi:10.1007/s11214-024-01126-6, and Zhang et al., Space Sci Rev 221, 31 (2025), doi:10.1007/s11214-025-01160-y. QuickLook is preliminary and not for publication without Science Working Team agreement. No ESA image is bundled.
+- SMILE UVI, when a catalog is loaded: Wang et al., Space Sci Rev 221, 9 (2025), doi:10.1007/s11214-024-01126-6, and Zhang et al., Space Sci Rev 221, 31 (2025), doi:10.1007/s11214-025-01160-y. QuickLook is preliminary and uncalibrated. No ESA image is bundled.
 - Made by Jeff Dumps ([@jdak907](https://github.com/jdak907)). Code is under the MIT License (see `LICENSE`).

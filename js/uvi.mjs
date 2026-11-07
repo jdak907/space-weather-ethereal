@@ -2,7 +2,7 @@
 // A frame is shown only inside its validity interval: never before it was taken,
 // and never held across a coverage gap. Nothing here calls ESA.
 
-export const PENDING = 'SMILE UVI feed pending Science Working Team agreement';
+export const FEED_OFF = 'SMILE UVI feed off - enable a local source to view QuickLook frames';
 export const NO_COVERAGE = 'no SMILE coverage';
 
 export const CITATIONS = {
@@ -27,7 +27,7 @@ export const QUALITY = 'preliminary · uncalibrated';
 
 const DAY = 864e5;
 
-export function pendingCatalog(reason = PENDING) {
+export function offCatalog(reason = FEED_OFF) {
   return {
     enabled: false,
     synthetic: false,
@@ -95,7 +95,7 @@ export function fmtAge(ms) {
 // now is wall-clock UTC, used only for "latest available, age".
 export function describe(catalog, viewTime, now) {
   const base = {
-    pendingText: PENDING,
+    offText: FEED_OFF,
     gapText: NO_COVERAGE,
     newest: null,
     ageMs: null,
@@ -105,7 +105,7 @@ export function describe(catalog, viewTime, now) {
     showingFuture: false,
   };
   if (!catalog || !catalog.enabled) {
-    return { ...base, state: 'pending', detail: catalog && catalog.reason ? catalog.reason : PENDING };
+    return { ...base, state: 'off', detail: catalog && catalog.reason ? catalog.reason : FEED_OFF };
   }
   const frames = catalog.frames || [];
   const frame = frameAt(frames, viewTime);

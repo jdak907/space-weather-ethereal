@@ -4,20 +4,16 @@ Checked 2026-11-07, anonymous, with no ESA login. This is a record of what the a
 
 The page at the repository root does not call these hosts. Real files go to `local/uvi/`, which is gitignored.
 
-## Policy
+## Data policy
 
-SMILE Data Policy KX-05-GZ-YJ-01, 21/03/2022, as excerpted on https://www.cosmos.esa.int/web/smile/archive:
+ESA's SMILE data policy (KX-05-GZ-YJ-01, 21/03/2022) is on https://www.cosmos.esa.int/web/smile/archive.
 
-> Quicklook plots will be publicly available as soon as feasible and, except with specific agreement from SWT, should not be used for publication.
-
-The Science Working Team has not agreed. QuickLook shown from a local catalog is still preliminary and uncalibrated, and it is not for a paper or a public figure.
-
-Cite, from that same page:
+QuickLook products checked here are preliminary and uncalibrated. Cite:
 
 - Wang, C., Branduardi-Raymont, G., Escoubet, C.P. et al. Solar Wind Magnetosphere Ionosphere Link Explorer (SMILE): Science and Mission Overview. Space Sci Rev 221, 9 (2025). https://doi.org/10.1007/s11214-024-01126-6
 - Zhang, XX., Wang, YM., He, F. et al. Ultraviolet Imager (UVI) for the SMILE Mission. Space Sci Rev 221, 31 (2025). https://doi.org/10.1007/s11214-025-01160-y
 
-The HelioPhysics Archive bundle also carries its own QuickLook disclaimer: the plots have not been verified by the Principal Investigators and should not be used for scientific publication or presentation.
+The HelioPhysics Archive says these QuickLook plots have not been verified by the Principal Investigators.
 
 ## What answered
 

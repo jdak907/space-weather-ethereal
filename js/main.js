@@ -191,7 +191,7 @@ function setBadge() {
   b.title = parts.join(' · ') + (D.errors.length ? `\nLive fetch issues: ${D.errors.join('; ')}` : '');
   $('about-status').innerHTML = `<p><b>Right now:</b> ${parts.join(' · ')}.<br>Bundled snapshot generated ${D.generated ? fmtTime(D.generated) : D.snapshotAsOf}.` +
     (D.errors.length ? `<br>Live fetch issues: ${D.errors.map((e) => e.replace(/</g, '&lt;')).join('; ')}` : '') + '<br>Schumann resonance: <b>modeled</b> (no open live numeric source).' +
-    `<br>SMILE UVI QuickLook: <b>${uvi.shortStatus()}</b>. Not one of the live feeds, and not for publication without Science Working Team agreement.</p>`;
+    `<br>SMILE UVI QuickLook: <b>${uvi.shortStatus()}</b>. Not one of the live feeds.</p>`;
 }
 
 function readout() {
@@ -268,7 +268,7 @@ function go(i, instant = false) {
   i = (i + scenes.length) % scenes.length;
   if (instant) { cur = i; next = -1; fadeT = 0; xfade.b = null; xfade.mix = 0; }
   else {
-    if (next >= 0) { cur = next; next = -1; xfade.b = null; xfade.mix = 0; } // finish a pending fade
+    if (next >= 0) { cur = next; next = -1; xfade.b = null; xfade.mix = 0; } // finish a crossfade already underway
     if (i !== cur) { next = i; fadeT = 0; }
   }
   dwellT = 0; setActive(i);

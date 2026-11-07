@@ -3,9 +3,10 @@
 
 The browser page does not call ESA. This script writes a timestamped catalog
 and images into a directory you choose. The default directory is local/uvi/,
-which is gitignored. Real QuickLook PNGs must not be committed, and ESA's
-data policy says QuickLook plots should not be used for publication unless
-the Science Working Team agrees. That agreement is not in place.
+which is gitignored. Real QuickLook PNGs must not be committed. The page
+stays off until a catalog is loaded. GitHub Pages cannot read the product
+endpoint directly: it sends no CORS header for that origin, and OPTIONS
+returns 403.
 
 What was confirmed on 2026-11-07 (see docs/smile-uvi.md) is the default, and
 every URL and the file format are flags so a change at the archive does not
@@ -386,7 +387,7 @@ def fetch_catalog(args) -> dict:
             "image": image,
             "full": "frames/" + os.path.basename(name),
             "synthetic": False,
-            "label": "ESA/CAS SMILE UVI QuickLook, preliminary, uncalibrated. Not for publication without SWT agreement.",
+            "label": "ESA/CAS SMILE UVI QuickLook, preliminary, uncalibrated.",
             "productId": row.get("product_id"),
             "itemVersion": row.get("item_version"),
             "bytes": len(blob),
@@ -410,7 +411,7 @@ def fetch_catalog(args) -> dict:
         "maxHoldMs": args.max_hold_ms,
         "generatedUtc": iso(int(dt.datetime.now(dt.timezone.utc).timestamp() * 1000)),
         "label": "Local SMILE UVI QuickLook catalog. Preliminary and uncalibrated.",
-        "publication": "QuickLook. Do not publish and do not commit these image files unless the Science Working Team agrees.",
+        "publication": "Local QuickLook catalog. Preliminary and uncalibrated. Do not commit these image files.",
         "frames": frames,
     }
     with open(os.path.join(args.out, "catalog.json"), "w", encoding="utf-8") as f:

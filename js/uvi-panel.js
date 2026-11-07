@@ -2,8 +2,8 @@
 // The window scrubs frames on their own clock. It does not move the orchestra playhead.
 import { UVI_CONFIG } from './uvi-config.js';
 import {
-  PENDING, NO_COVERAGE, CITATIONS, CREDIT, QUALITY,
-  pendingCatalog, describe, normalizeCatalog, fmtAge, iso, latestAt,
+  FEED_OFF, NO_COVERAGE, CITATIONS, CREDIT, QUALITY,
+  offCatalog, describe, normalizeCatalog, fmtAge, iso, latestAt,
 } from './uvi.mjs';
 import { createUviVoice, uviSample } from './uvi-audio.mjs';
 
@@ -18,7 +18,7 @@ function citeBlock() {
 export function mountUvi(root, zoomEl, opt = {}) {
   const defaults = { ...UVI_CONFIG, ...(opt.config || {}) };
   const voice = createUviVoice();
-  let catalog = pendingCatalog();
+  let catalog = offCatalog();
   let globalTime = Date.now();
   let zoomOpen = false;
   let zoomTime = null;
@@ -36,7 +36,7 @@ export function mountUvi(root, zoomEl, opt = {}) {
         <button type="button" data-uvi="zoom">Aurora window</button>
       </div>
     </div>
-    <p class="uvi-credit">${CREDIT} · QuickLook · not for publication without Science Working Team agreement</p>
+    <p class="uvi-credit">${CREDIT} · QuickLook</p>
     <p class="uvi-cite-short">Wang et al. 2025, Space Sci Rev 221, 9. Zhang et al. 2025, Space Sci Rev 221, 31.</p>
     <div class="uvi-stage" data-uvi-stage>
       <img alt="" hidden>
@@ -129,11 +129,11 @@ export function mountUvi(root, zoomEl, opt = {}) {
       img.hidden = true;
       img.alt = '';
       parts.ph.hidden = false;
-      parts.ph.textContent = d.state === 'pending' ? PENDING : ahead ? 'Ahead of now · not current' : NO_COVERAGE;
+      parts.ph.textContent = d.state === 'off' ? FEED_OFF : ahead ? 'Ahead of now · not current' : NO_COVERAGE;
     }
-    if (d.state === 'pending') {
-      parts.status.textContent = PENDING;
-      parts.times.textContent = catalog.reason && catalog.reason !== PENDING ? catalog.reason : 'The globe is the Kp model, not a SMILE image.';
+    if (d.state === 'off') {
+      parts.status.textContent = FEED_OFF;
+      parts.times.textContent = catalog.reason && catalog.reason !== FEED_OFF ? catalog.reason : 'The globe is the Kp model, not a SMILE image.';
     } else if (showImg && ahead) {
       parts.status.textContent = 'Ahead of now · not current';
       const f = d.frame;
@@ -156,7 +156,7 @@ export function mountUvi(root, zoomEl, opt = {}) {
         ? `Last observation ${iso(d.prior.obsTime)} (${fmtAge(t - d.prior.obsTime) || '0 s'} before this time), not held.`
         : 'No earlier frame.';
     }
-    parts.latest.textContent = d.state === 'pending' ? '' : (d.age ? `latest available, age ${d.age}` : 'latest available, age —');
+    parts.latest.textContent = d.state === 'off' ? '' : (d.age ? `latest available, age ${d.age}` : 'latest available, age —');
   }
 
   function paintAll() {
@@ -253,9 +253,9 @@ export function mountUvi(root, zoomEl, opt = {}) {
         await loadUrl(defaults.localCatalog, 'local'); return;
       }
     } catch (e) {
-      catalog = pendingCatalog(PENDING);
+      catalog = offCatalog(FEED_OFF);
       message = q === 'local' || defaults.loadLocalCatalog
-        ? 'Local catalog not found. ' + PENDING
+        ? 'Local catalog not found. ' + FEED_OFF
         : (e.message || String(e));
     }
     paintAll();
@@ -271,8 +271,8 @@ export function mountUvi(root, zoomEl, opt = {}) {
       b.setAttribute('aria-expanded', infoOpen ? 'true' : 'false');
     } else if (act === 'zoom') openZoom();
     else if (act === 'synthetic') { try { await loadUrl(defaults.syntheticCatalog, 'synthetic'); } catch (err) { message = err.message || String(err); paintAll(); } }
-    else if (act === 'local') { try { await loadUrl(defaults.localCatalog, 'local'); } catch (err) { catalog = pendingCatalog(PENDING); message = 'Local catalog not found. ' + PENDING; paintAll(); } }
-    else if (act === 'clear') { catalog = pendingCatalog(); message = ''; paintAll(); if (opt.onChange) opt.onChange(); }
+    else if (act === 'local') { try { await loadUrl(defaults.localCatalog, 'local'); } catch (err) { catalog = offCatalog(FEED_OFF); message = 'Local catalog not found. ' + FEED_OFF; paintAll(); } }
+    else if (act === 'clear') { catalog = offCatalog(); message = ''; paintAll(); if (opt.onChange) opt.onChange(); }
     else if (act === 'url') {
       const input = root.querySelector('[data-uvi-url]');
       const href = safeHttp(input && input.value);
@@ -318,7 +318,7 @@ export function mountUvi(root, zoomEl, opt = {}) {
 
   function shortStatus() {
     const d = coverage(globalTime);
-    if (d.state === 'pending') return 'pending SWT agreement';
+    if (d.state === 'off') return 'off';
     if (d.state === 'gap') return 'no coverage';
     if (d.showingFuture) return 'not current';
     return d.age ? 'age ' + d.age : 'in view';
